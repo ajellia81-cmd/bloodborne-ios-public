@@ -17,7 +17,7 @@ jobs:
           set -euo pipefail
           mkdir -p output
           ls -d /Applications/Xcode*.app | tee output/installed-xcodes.txt
-          selected_xcode="$(python3 -c 'import glob,re; p=glob.glob("/Applications/Xcode*.app"); print(max(p,key=lambda x:tuple(map(int,re.findall(r"[0-9]+",x))) if p else "/Applications/Xcode.app")')"
+          selected_xcode="/Applications/Xcode_26.3.app"
           export DEVELOPER_DIR="$selected_xcode/Contents/Developer"
           echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
           xcodebuild -version | tee output/xcode.txt
