@@ -9,6 +9,9 @@ Public experimental workspace for an iPhone 18 Pro Max port, using cloud tooling
 - No compilation steps ran, no artifacts were produced, and no compiler success or compiler failure can be inferred from that run.
 - Public repository migration was requested by the owner. Public runner availability must be tested independently. No game data is uploaded.
 
+## Public repository compilation
+The public repository successfully started a macOS ARM64 runner. Its first run compiled upstream src/platform.c to a Mach-O ARM64 iOS object. AppKit_RuntimeHooks.m failed because the runner defaulted to Xcode 16.4 / iOS SDK 18.5, which lacks Metal 4 compiler declarations. The workflow now explicitly selects the confirmed installed Xcode 26.3 toolchain; the replacement build must be checked before declaring shim compilation successful.
+
 ## Source findings (not device validation)
 - bloodborne-native/bloodborne-mac packages bloodborne-runtime, bloodborne-recomp and bloodborne-launcher.
 - The runtime already contains limited TARGET_OS_IPHONE platform adaptations and ios/bbgpu_stub.c. That GPU stub draws nothing and is explicitly a CPU-only proof of concept.
