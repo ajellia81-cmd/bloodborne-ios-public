@@ -1,0 +1,51 @@
+name: iOS toolchain feasibility
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ios-feasibility.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Apple toolchains
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          xcodebuild -version | tee output/xcode.txt
+          xcrun --sdk iphoneos --show-sdk-version | tee output/sdk.txt
+      - name: Fetch upstream sources without game data
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/bloodborne-native/bloodborne-runtime.git upstream-runtime
+          git clone --depth 1 https://github.com/zorrobyte/macos-on-ios-public.git upstream-shims
+          git -C upstream-runtime rev-parse HEAD > output/runtime-sha.txt
+          git -C upstream-shims rev-parse HEAD > output/shims-sha.txt
+      - name: Compile actual runtime platform layer for iOS
+        run: |
+          set -euo pipefail
+          xcrun --sdk iphoneos clang -target arm64-apple-ios17.0 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -std=gnu11 -Wall -Wextra -I upstream-runtime/src -c upstream-runtime/src/platform.c -o output/platform.o 2>&1 | tee output/platform-build.log
+          file output/platform.o | tee output/platform-result.txt
+      - name: Compile macos-on-ios handwritten shims
+        if: always()
+        run: |
+          set -uo pipefail
+          failed=0
+          for src in upstream-shims/shim/overrides/*.m; do
+            name="$(basename "$src" .m)"
+            if ! xcrun --sdk iphoneos clang -target arm64-apple-ios17.0 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -fobjc-arc -c "$src" -o "output/$name.o" > "output/$name.log" 2>&1; then
+              echo "FAIL: $src"
+              failed=1
+            fi
+          done
+          exit "$failed"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-upstream-compile-diagnostics
+          path: output/
+          retention-days: 14
