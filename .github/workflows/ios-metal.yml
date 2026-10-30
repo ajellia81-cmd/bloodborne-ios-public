@@ -1,0 +1,57 @@
+name: iOS Metal runtime build
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ios-metal.yml'
+      - 'scripts/fetch-ios-deps.py'
+permissions:
+  contents: read
+concurrency:
+  group: ios-metal-main
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch runtime and game-free submodules
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          git clone --depth 1 https://github.com/bloodborne-native/bloodborne-runtime.git upstream-runtime
+          git -C upstream-runtime submodule update --init --depth 1 recomp third_party/LibAtrac9 gpu/third_party/imgui
+          git -C upstream-runtime rev-parse HEAD | tee output/runtime-sha.txt
+      - name: Install host shader tools
+        run: brew install glslang pkgconf nasm
+      - name: Fetch pinned iOS dependency sources
+        run: python3 scripts/fetch-ios-deps.py
+      - name: Build upstream iOS dependency libraries
+        run: |
+          set -euo pipefail
+          bash upstream-runtime/scripts/ios/build-deps.sh 2>&1 | tee output/deps-build.log
+      - name: Build actual iOS Metal GPU library
+        run: |
+          set -euo pipefail
+          bash upstream-runtime/scripts/ios/build-gpu.sh 2>&1 | tee output/gpu-build.log
+      - name: Build actual runtime without GPU stubs
+        run: |
+          set -euo pipefail
+          bash upstream-runtime/scripts/ios/build-core.sh 2>&1 | tee output/core-build.log
+          cp upstream-runtime/out/ios/libbbios.a output/
+          cp upstream-runtime/out/ios/gpu/libbbgpu.a output/
+      - name: Collect GPU compiler diagnostics
+        if: always()
+        run: |
+          if [ -f upstream-runtime/out/ios/gpu-build.log ]; then
+            cp upstream-runtime/out/ios/gpu-build.log output/gpu-full-build.log
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-metal-runtime-diagnostics
+          path: output/
+          retention-days: 14
