@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/workflows/ios-cpu.yml'
       - 'ios/**'
+concurrency:
+  group: ios-cpu-main
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -40,10 +43,19 @@ jobs:
         run: |
           set -euo pipefail
           cmake --build build-ios --parallel 3 2>&1 | tee output/build.log
-          cp build-ios/bb-probe output/
+          cp build-ios/bb-probe.app/bb-probe output/
           file output/bb-probe | tee output/binary.txt
           xcrun vtool -show-build output/bb-probe | tee output/platform.txt
           otool -L output/bb-probe | tee output/linkage.txt
+      - name: Package unsigned CPU diagnostic IPA
+        run: |
+          set -euo pipefail
+          mkdir -p output/Payload
+          cp -R build-ios/BloodborneCPUProbe.app output/Payload/
+          codesign --remove-signature output/Payload/BloodborneCPUProbe.app/BloodborneCPUProbe 2>/dev/null || true
+          cd output
+          zip -qr Bloodborne-CPUProbe-unsigned.ipa Payload
+          unzip -l Bloodborne-CPUProbe-unsigned.ipa
       - uses: actions/upload-artifact@v4
         if: always()
         with:
