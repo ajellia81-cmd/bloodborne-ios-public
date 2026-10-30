@@ -84,5 +84,8 @@ jobs:
         if: always()
         with:
           name: ios-metal-runtime-diagnostics
-          path: output/
+          path: |
+            output/*.ipa
+            output/*.txt
+            output/*.log
           retention-days: 14
