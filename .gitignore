@@ -1,0 +1,23 @@
+# Personal game data and generated game code must never be committed.
+game/
+games/
+dvdroot_ps4/
+sce_sys/
+sce_module/
+*.bin
+*.prx
+*.self
+*.pkg
+*.iso
+*.ipa
+*.dylib
+*.a
+*.o
+upstream-*/
+build-*/
+out/
+output/
+user/
+personal-data/
+generated/
+__pycache__/
