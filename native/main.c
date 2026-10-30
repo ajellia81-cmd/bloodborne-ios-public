@@ -13,19 +13,23 @@ int bb_probe_main(int argc,char **argv);
 static int exists(const char *p) { return access(p,R_OK)==0; }
 int main(int argc,char **argv) {
     (void)argc; (void)argv;
-    char root[4096],game[4096],boot[4096],user[4096],patches[4096],recomp[4096],log[4096];
+    char root[4096],game[4096],boot[4096],user[4096],patches[4096],content[4096],config[4096],log[4096];
     snprintf(root,sizeof(root),"%s/Documents/Bloodborne",getenv("HOME"));
     mkdir(root,0700);
     snprintf(game,sizeof(game),"%s/game",root);
     snprintf(boot,sizeof(boot),"%s/boot-linked.bin",root);
     snprintf(user,sizeof(user),"%s/user",root);
     snprintf(patches,sizeof(patches),"%s/patches.bin",root);
-    snprintf(recomp,sizeof(recomp),"%s/librecomp.dylib",root);
+    snprintf(content,sizeof(content),"%s/content.bin",root);
+    snprintf(config,sizeof(config),"%s/bbport.ini",root);
     snprintf(log,sizeof(log),"%s/runtime.log",root);
     mkdir(user,0700);
     freopen(log,"a",stdout); setvbuf(stdout,NULL,_IONBF,0);
     dup2(fileno(stdout),STDERR_FILENO);
     puts("Bloodborne iOS experimental runtime; game execution unverified.");
+    setenv("BB_CONFIG",config,1);
+    setenv("BB_GPU_USER_DIR",user,1);
+    setenv("BB_USER_DIR",user,1);
     setenv("BB_JIT","0",1);
     setenv("BB_METAL_FRAME","1",1);
     setenv("BB_METAL_NATIVE_BOOT","1",1);
@@ -38,6 +42,7 @@ int main(int argc,char **argv) {
     setenv("BB_OUTPUT_RES","960x540",1);
     setenv("BB_RENDER_RES","960x540",1);
     setenv("BB_FPS","30",1);
+    setenv("BB_FPS_LIMIT","30",1);
     setenv("BB_UPSCALER","off",1);
     if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMEPAD)) return 1;
     SDL_Window *window=NULL; SDL_Renderer *renderer=NULL;
@@ -52,7 +57,7 @@ int main(int argc,char **argv) {
                 (event.type==SDL_EVENT_GAMEPAD_BUTTON_UP && event.gbutton.button==SDL_GAMEPAD_BUTTON_SOUTH)) start=1;
         }
         char eboot[4096]; snprintf(eboot,sizeof(eboot),"%s/eboot.bin",game);
-        int ready=exists(boot)&&exists(eboot)&&exists(patches);
+        int ready=exists(boot)&&exists(eboot)&&exists(patches)&&exists(content);
         SDL_SetRenderDrawColor(renderer,12,14,20,255); SDL_RenderClear(renderer);
         SDL_SetRenderDrawColor(renderer,225,225,230,255); SDL_SetRenderScale(renderer,2,2);
         SDL_RenderDebugText(renderer,20,20,"Bloodborne iOS - Experimental");
@@ -62,6 +67,7 @@ int main(int argc,char **argv) {
         SDL_RenderDebugText(renderer,40,170,"  game/            Your decrypted game folder, update 1.09 merged");
         SDL_RenderDebugText(renderer,40,195,"  boot-linked.bin  Prepared from your game and system modules");
         SDL_RenderDebugText(renderer,40,220,"  patches.bin      Prepared for 960x540");
+        SDL_RenderDebugText(renderer,40,240,"  content.bin      AppContent profile from your game");
         SDL_RenderDebugText(renderer,40,260,"Korean game language requested. Region/DLC compatibility unverified.");
         SDL_RenderDebugText(renderer,40,290,"This build has not been tested on a physical iPhone.");
         SDL_RenderDebugText(renderer,40,330,ready?"Files found. Tap screen or press controller A to try booting.":"Required files missing. Copy files into the app, then tap to recheck.");
@@ -75,6 +81,6 @@ int main(int argc,char **argv) {
     SDL_QuitSubSystem(SDL_INIT_VIDEO);
     // A downloaded Documents dylib is not loaded: game AOT code must be embedded and re-signed
     // as part of a separate, personal build. Never publish generated game code.
-    char *arguments[]={"BloodborneIOS",boot,"--app0",game,"--user",user,"--patches",patches,"--timeout","0",NULL};
-    return bb_probe_main(10,arguments);
+    char *arguments[]={"BloodborneIOS",boot,"--app0",game,"--user",user,"--patches",patches,"--content-profile",content,"--timeout","0",NULL};
+    return bb_probe_main(12,arguments);
 }
