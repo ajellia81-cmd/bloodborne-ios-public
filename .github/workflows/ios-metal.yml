@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/ios-metal.yml'
       - 'scripts/fetch-ios-deps.py'
+      - 'scripts/package-native.sh'
+      - 'native/**'
 permissions:
   contents: read
 concurrency:
@@ -27,12 +29,26 @@ jobs:
           git -C upstream-runtime rev-parse HEAD | tee output/runtime-sha.txt
       - name: Install host shader tools
         run: brew install glslang pkgconf nasm
+      - uses: actions/cache/restore@v4
+        id: ios-deps-cache
+        with:
+          path: |
+            upstream-runtime/deps/ios-arm64
+            upstream-runtime/deps/build-ios
+          key: ios-metal-xcode26.3-${{ hashFiles('upstream-runtime/deps/packages.cmake', 'upstream-runtime/scripts/ios/build-deps.sh') }}
       - name: Fetch pinned iOS dependency sources
         run: python3 scripts/fetch-ios-deps.py
       - name: Build upstream iOS dependency libraries
         run: |
           set -euo pipefail
           bash upstream-runtime/scripts/ios/build-deps.sh 2>&1 | tee output/deps-build.log
+      - uses: actions/cache/save@v4
+        if: steps.ios-deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            upstream-runtime/deps/ios-arm64
+            upstream-runtime/deps/build-ios
+          key: ${{ steps.ios-deps-cache.outputs.cache-primary-key }}
       - name: Build actual iOS Metal GPU library
         run: |
           set -euo pipefail
@@ -43,6 +59,10 @@ jobs:
           bash upstream-runtime/scripts/ios/build-core.sh 2>&1 | tee output/core-build.log
           cp upstream-runtime/out/ios/libbbios.a output/
           cp upstream-runtime/out/ios/gpu/libbbgpu.a output/
+      - name: Package full native runtime unsigned IPA
+        run: |
+          set -euo pipefail
+          bash scripts/package-native.sh 2>&1 | tee output/package-build.log
       - name: Collect GPU compiler diagnostics
         if: always()
         run: |
