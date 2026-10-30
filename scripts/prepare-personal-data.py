@@ -24,4 +24,4 @@ for name in ["boot-linked.bin","content.bin","patches.bin"]:
     path=out/name
     if not path.is_file() or not path.stat().st_size:
         raise RuntimeError(f"Preparation did not produce {name}")
-print("Personal boot files are prepared. They are not game data, DLC, or performance validation.")
+print("Personal boot files contain derived game code: keep them private and outside Git. Preparation does not validate game loading, DLC or performance.")
