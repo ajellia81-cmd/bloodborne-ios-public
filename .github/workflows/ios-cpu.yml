@@ -56,6 +56,37 @@ jobs:
           cd output
           zip -qr Bloodborne-CPUProbe-unsigned.ipa Payload
           unzip -l Bloodborne-CPUProbe-unsigned.ipa
+      - name: Build simulator diagnostic app
+        run: |
+          set -euo pipefail
+          cmake -S ios -B build-simulator -G Ninja \
+            -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphonesimulator \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -DRUNTIME_SOURCE="$PWD/upstream-runtime" -DSDL_SOURCE="$PWD/upstream-sdl" \
+            -DZYDIS_SOURCE="$PWD/upstream-zydis" > output/simulator-configure.log 2>&1
+          cmake --build build-simulator --target BloodborneCPUProbe --parallel 3 2>&1 | tee output/simulator-build.log
+      - name: Execute synthetic x86-64 addition in iOS simulator
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available --json > output/simulators.json
+          device="$(python3 -c 'import json; d=json.load(open("output/simulators.json")); print(next(x["udid"] for v in d["devices"].values() for x in v if x.get("isAvailable") and x["name"].startswith("iPhone")))')"
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" build-simulator/BloodborneCPUProbe.app
+          SIMCTL_CHILD_BB_AUTOTEST=1 xcrun simctl launch --terminate-running-process "$device" com.ajellia81.bloodborne.cpuprobe
+          data="$(xcrun simctl get_app_container "$device" com.ajellia81.bloodborne.cpuprobe data)"
+          for attempt in {1..30}; do
+            if [ -s "$data/Documents/cpu-result.txt" ]; then
+              cp "$data/Documents/cpu-result.txt" output/simulator-cpu-result.txt
+              cat output/simulator-cpu-result.txt
+              grep '^PASS' output/simulator-cpu-result.txt
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Simulator did not produce a CPU result" >&2
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
