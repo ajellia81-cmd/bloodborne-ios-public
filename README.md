@@ -5,7 +5,7 @@ Public experimental workspace for an iPhone 18 Pro Max port, using cloud tooling
 ## Verified repository state (2026-10-30, Korea)
 - The original workflow only compiled a trivial C function to an iOS ARM64 object.
 - The current workflow compiles the actual upstream runtime platform layer and every handwritten macos-on-ios shim separately, and uploads build diagnostics.
-- Run #3, commit e77990c125ecf916453138852ecc67d464ba56c3, failed **before a runner started**. GitHub's annotation says: "The job was not started because recent account payments have failed or your spending limit needs to be increased."
+- The historical private run failed **before a runner started**. It supplied no compiler evidence. Public macOS runner access has since been verified.
 - No compilation steps ran, no artifacts were produced, and no compiler success or compiler failure can be inferred from that run.
 - Public repository migration was requested by the owner. Public runner availability must be tested independently. No game data is uploaded.
 
@@ -27,7 +27,7 @@ Korean edition compatibility remains unverified: the executable must match the s
 Upstream documents GOTY-integrated The Old Hunters (including CUSA03023 and CUSA03173); standalone add-on packages are not currently loaded.
 
 ## Next gates
-1. Restore Actions runner access and inspect actual compilation diagnostics; fix and rebuild.
+1. Inspect actual compilation diagnostics, fix failures and rebuild. Public runner access is verified.
 2. Build and link the CPU runtime and an iOS app entry point without game data.
 3. Evaluate the real Metal renderer and macos-on-ios integration; preserve upstream licenses and credits.
 4. Produce an unsigned IPA and verify its Mach-O platforms, dependencies and package structure.
@@ -51,3 +51,6 @@ Built on upstream Bloodborne-native, bbport and shadPS4 work; macos-on-ios is a 
 
 ## Simulator execution
 Run 40978238814 passed the device build, simulator build and a cloud iOS simulator execution of the diagnostic app. The real bbcpu interpreter returned 42 for the synthetic x86-64 addition function with arguments 19 and 23. This verifies that narrow interpreter/ABI/stack path in the simulator, not physical-device address space, rendering, the game or performance.
+
+## Native Metal build result
+Run 40978956252 built the actual upstream iOS Metal GPU static library successfully. The subsequent core step stopped before compilation because macOS's default Bash 3.2 treats the upstream script's empty stub array as unbound under nounset. The workflow now installs and explicitly uses modern Bash for that step. Final app linking and native runtime IPA packaging remain pending.
