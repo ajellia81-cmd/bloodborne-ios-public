@@ -1,6 +1,6 @@
 # Bloodborne iOS feasibility
 
-Public experimental workspace for an iPhone 18 Pro Max port, using cloud tooling and GitHub Actions macOS runners. **No playable iOS IPA has been built or verified.**
+Public experimental workspace for an iPhone 18 Pro Max port, using cloud tooling and GitHub Actions macOS runners. **No playable iOS game build has been verified.** A CPU-only diagnostic unsigned IPA has been built and structurally validated.
 
 ## Verified repository state (2026-10-30, Korea)
 - The original workflow only compiled a trivial C function to an iOS ARM64 object.
@@ -14,10 +14,10 @@ The public repository successfully started a macOS ARM64 runner. Its first run c
 
 ## Source findings (not device validation)
 - bloodborne-native/bloodborne-mac packages bloodborne-runtime, bloodborne-recomp and bloodborne-launcher.
-- The runtime already contains limited TARGET_OS_IPHONE platform adaptations and ios/bbgpu_stub.c. That GPU stub draws nothing and is explicitly a CPU-only proof of concept.
+- Upstream docs/IOS_POC.md describes an iPhone 17 Pro Max proof of concept using native Metal, AOT game code and interpreter fallback. This is an upstream report, not a result reproduced here. scripts/ios/build-deps.sh, build-gpu.sh, build-core.sh and recomp.sh are public. The upstream app shell remains private. ios/bbgpu_stub.c is a separate CPU-only stub that draws nothing.
 - The normal runtime build still selects macOS dependencies, desktop packaging and helper executables. There is no complete iOS build target in the reviewed main CMakeLists.txt.
 - macos-on-ios-public retags ARM64 Mach-O files and adds UIKit-backed shims. Its converter currently requires a signing identity, team and provisioning profile; it has no unsigned-output option.
-- The macOS runtime uses dynamic CPU translation or an optional ahead-of-time compiled game library. macos-on-ios does not itself provide JIT. An iOS CPU execution strategy, including any remaining dynamic-code fallback, must be verified.
+- The CPU source disables JIT under TARGET_OS_IPHONE and falls back to its interpreter. Upstream's iOS PoC uses an ahead-of-time game library for performance. No generated game code is included here. macos-on-ios has been compile-tested as an alternative, but its retagging does not supply JIT; the native iOS runtime is the primary build path.
 - Compiling a shim or platform object does not verify linking, app launch, Metal rendering, game execution, memory use or performance.
 
 ## Game data and compatibility
@@ -41,3 +41,10 @@ Upstream documents GOTY-integrated The Old Hunters (including CUSA03023 and CUSA
 - https://github.com/bloodborne-native/bloodborne-mac/blob/main/docs/guide/game-files.md
 
 Built on upstream Bloodborne-native, bbport and shadPS4 work; macos-on-ios is a separate compatibility project.
+
+## Current build results
+- The private ajellia81-cmd/bloodborne-ios repository was deleted at the owner's request after the public files were verified.
+- Run 40977401736 successfully compiled and linked the complete CPU runtime, SDL 3.4.18, Zydis 4.1.1, LibAtrac9 and the upstream CPU-only GPU stub for iOS ARM64.
+- Bloodborne-CPUProbe-unsigned.ipa contains a UIKit test that calls the real interpreter with a self-authored seven-byte addition function. The IPA's executable is ARM64, has an iOS build-version command, and has no code-signature load command. The test has not been executed on a physical device.
+- The full native Metal runtime workflow builds the upstream iOS dependencies, GPU library and core, then links the new SDL app shell. Its results must be checked before claiming a full runtime IPA.
+- The native shell expects separately prepared boot-linked.bin and 960x540 patches.bin plus the user's game/ directory in Documents/Bloodborne. It defaults to Korean game language (PS4 language 9), 960x540, Metal, interpreter fallback and offline play. Language, DLC, game loading and rendering remain unverified.
