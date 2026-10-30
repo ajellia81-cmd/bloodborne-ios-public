@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(BloodborneIOSCPU LANGUAGES C CXX ASM)
+project(BloodborneIOSCPU LANGUAGES C CXX ASM OBJC)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   message(FATAL_ERROR "This target must use the iOS SDK")
 endif()
@@ -26,3 +26,10 @@ target_include_directories(bb-runtime PUBLIC ${RUNTIME_SOURCE} ${RUNTIME_SOURCE}
 target_link_libraries(bb-runtime PUBLIC bbcpu atrac9 SDL3::SDL3-static "-framework Foundation")
 add_executable(bb-probe ${RUNTIME_SOURCE}/src/probe.c ${RUNTIME_SOURCE}/src/vulkan_smoke.c)
 target_link_libraries(bb-probe PRIVATE bb-runtime)
+
+add_executable(BloodborneCPUProbe MACOSX_BUNDLE main.m)
+target_compile_options(BloodborneCPUProbe PRIVATE -fobjc-arc)
+target_link_libraries(BloodborneCPUProbe PRIVATE bb-runtime "-framework UIKit")
+set_target_properties(BloodborneCPUProbe PROPERTIES
+  MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
+  XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO)
