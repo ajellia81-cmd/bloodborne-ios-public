@@ -34,6 +34,10 @@
         [stack.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-20]
     ]];
 }
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    if (getenv("BB_AUTOTEST")) [self runProbe];
+}
 - (void)runProbe {
     self.runButton.enabled = NO;
     self.result.text = @"CPU 검사 중…";
@@ -55,6 +59,8 @@
                 result==42 ? @"PASS" : @"FAIL",(unsigned long long)result,
                 UIDevice.currentDevice.model,UIDevice.currentDevice.systemVersion];
         }
+        NSString *documents=NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES).firstObject;
+        [message writeToFile:[documents stringByAppendingPathComponent:@"cpu-result.txt"] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         dispatch_async(dispatch_get_main_queue(),^{self.result.text=message;});
     });
 }
