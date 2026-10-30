@@ -1,0 +1,52 @@
+name: iOS CPU runtime link
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ios-cpu.yml'
+      - 'ios/**'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch open source dependencies
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          git clone --depth 1 https://github.com/bloodborne-native/bloodborne-runtime.git upstream-runtime
+          git -C upstream-runtime submodule update --init --depth 1 recomp third_party/LibAtrac9
+          git clone --depth 1 --branch release-3.4.18 https://github.com/libsdl-org/SDL.git upstream-sdl
+          git clone --depth 1 --branch v4.1.1 --recursive --shallow-submodules https://github.com/zyantific/zydis.git upstream-zydis
+          for repo in upstream-runtime upstream-runtime/recomp upstream-runtime/third_party/LibAtrac9 upstream-sdl upstream-zydis; do
+            echo "$repo $(git -C "$repo" rev-parse HEAD)" >> output/source-versions.txt
+          done
+      - name: Configure iOS ARM64 CPU runtime
+        run: |
+          set -euo pipefail
+          cmake -S ios -B build-ios -G Ninja \
+            -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -DRUNTIME_SOURCE="$PWD/upstream-runtime" \
+            -DSDL_SOURCE="$PWD/upstream-sdl" -DZYDIS_SOURCE="$PWD/upstream-zydis" \
+            2>&1 | tee output/configure.log
+      - name: Compile and link CPU-only runtime
+        run: |
+          set -euo pipefail
+          cmake --build build-ios --parallel 3 2>&1 | tee output/build.log
+          cp build-ios/bb-probe output/
+          file output/bb-probe | tee output/binary.txt
+          xcrun vtool -show-build output/bb-probe | tee output/platform.txt
+          otool -L output/bb-probe | tee output/linkage.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-cpu-runtime-diagnostics
+          path: output/
+          retention-days: 14
