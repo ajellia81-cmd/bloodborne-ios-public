@@ -54,3 +54,6 @@ Run 40978238814 passed the device build, simulator build and a cloud iOS simulat
 
 ## Native Metal build result
 Run 40978956252 built the actual upstream iOS Metal GPU static library successfully. The subsequent core step stopped before compilation because macOS's default Bash 3.2 treats the upstream script's empty stub array as unbound under nounset. The workflow now installs and explicitly uses modern Bash for that step. Final app linking and native runtime IPA packaging remain pending.
+
+## Native iPhone display
+The iOS shell now queries the fullscreen high-density drawable's actual pixel dimensions in landscape. Both output and fixed scene rendering use that size, and the settings file selects aspect_ratio=auto. No 16:9 output or 960x540 render size is forced. The menu canvas scales uniformly rather than stretching. The bundled upstream patch XML is used by the current runtime's native patch builder (--patches -), so the game resolution patch is generated at launch for the measured screen; a separately prepared patches.bin is no longer required. A 2868x1320 drawable is therefore requested as 2868x1320, at its own 239:110 aspect ratio. Physical-device rendering, game UI placement, memory use and frame rate remain unverified until tested with the user's data.
