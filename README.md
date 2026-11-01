@@ -11,7 +11,7 @@ A game-free iOS shell for Bloodborne-native, built entirely with cloud tooling a
 | Real CPU interpreter executing a synthetic x86-64 addition in cloud iOS Simulator 18.5 | Passed: 19 + 23 returned 42 (run 40978238814) |
 | Actual native Metal GPU, core, app link and unsigned IPA packaging | Passed for the earlier fixed-resolution shell (run 40979870364) |
 | Native-display profile behavior | Passed: portrait normalization, landscape pixels, aspect auto and preservation of unrelated settings |
-| Updated native-display IPA | Rebuild in progress; check the latest Actions result |
+| Updated native-display IPA | Passed: run 41284868696; unsigned iOS ARM64, bundled patch XML, system framework/library imports only |
 | Physical iPhone launch, game loading, Korean rendering, DLC, frame rate and memory | Not verified |
 
 The earlier compiler failure in macos-on-ios used the runner's default Xcode 16.4 / SDK 18.5, which lacks Metal 4 declarations. The workflow explicitly selects Xcode 26.3. The upstream iOS core script also needs modern Bash to handle its empty GPU-stub array under nounset; the workflow uses Homebrew Bash.
@@ -64,3 +64,5 @@ Built on Bloodborne-native, bbport by deadinside28 and shadPS4. macos-on-ios is 
 - https://github.com/bloodborne-native/bloodborne-runtime
 - https://github.com/bloodborne-native/bloodborne-recomp
 - https://github.com/zorrobyte/macos-on-ios-public
+
+The native-display IPA was structurally validated after download: ZIP integrity, ARM64 CPU type, iOS Mach-O platform, no code-signature load command, landscape orientations, hidden status bar and bundled resolution patch XML. SHA256: 3822953e50149bce94038732b881042599036a0721890ee13f874b6d31c44e44. The latest shader scanner also requires zlib; the app link includes -lz. These checks do not substitute for physical-device or game testing.
