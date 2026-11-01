@@ -26,7 +26,7 @@ xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework VideoToolbox \
   -framework AudioToolbox -framework AVFoundation -framework GameController -framework CoreHaptics \
   -framework Security -framework SystemConfiguration -framework Accelerate \
-  -Wl,-export_dynamic -o "$app/BloodborneIOS"
+  -lz -Wl,-export_dynamic -o "$app/BloodborneIOS"
 for dir in "$runtime" "$runtime/recomp" "$runtime/third_party/LibAtrac9" "$runtime"/deps/build/src/*; do
   for notice in "$dir"/LICENSE "$dir"/LICENSE.txt "$dir"/LICENSE.md "$dir"/COPYING; do
     if [ -f "$notice" ]; then
