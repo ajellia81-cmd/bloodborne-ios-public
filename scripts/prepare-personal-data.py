@@ -19,8 +19,8 @@ for required in ["eboot.bin","sce_sys/param.sfo","dvdroot_ps4"]:
 out.mkdir(parents=True,exist_ok=True)
 for name in ["prepare.py","link_libc.py","link_modules.py","content_profile.py"]:
     subprocess.run([sys.executable,str(runtime/"scripts"/name),str(game),"--out",str(out)],cwd=runtime,check=True)
-subprocess.run([sys.executable,str(runtime/"scripts/patches.py"),"--out",str(out),"--fps","30","--game-dir",str(game),"--render-res","960x540","--output-res","960x540"],cwd=runtime,check=True)
-for name in ["boot-linked.bin","content.bin","patches.bin"]:
+# Resolution patches are generated inside the app from the actual device pixel size.
+for name in ["boot-linked.bin","content.bin"]:
     path=out/name
     if not path.is_file() or not path.stat().st_size:
         raise RuntimeError(f"Preparation did not produce {name}")
