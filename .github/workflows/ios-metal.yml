@@ -49,6 +49,11 @@ jobs:
             upstream-runtime/deps/ios-arm64
             upstream-runtime/deps/build-ios
           key: ${{ steps.ios-deps-cache.outputs.cache-primary-key }}
+      - name: Check native display profile behavior
+        run: |
+          set -euo pipefail
+          xcrun --sdk macosx clang -std=gnu11 -Wall -Wextra -Werror -Iupstream-runtime/deps/ios-arm64/include native/display.c tests/display_profile.c -o output/display-profile-test
+          output/display-profile-test | tee output/display-profile-test.txt
       - uses: actions/cache/restore@v4
         id: ios-gpu-cache
         with:

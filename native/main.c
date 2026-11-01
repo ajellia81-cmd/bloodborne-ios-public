@@ -4,6 +4,7 @@
  */
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include "display.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,38 +12,6 @@
 #include <unistd.h>
 int bb_probe_main(int argc,char **argv);
 static int exists(const char *p) { return access(p,R_OK)==0; }
-
-/* Keep all other options, but make output and projection follow the phone exactly. */
-static int display_profile(const char *path,int width,int height) {
-    char temp[4096]; snprintf(temp,sizeof(temp),"%s.tmp",path);
-    FILE *out=fopen(temp,"w"); if (!out) return -1;
-    FILE *in=fopen(path,"r"); char line[1024];
-    while (in && fgets(line,sizeof(line),in)) {
-        char key[128]={0};
-        if (sscanf(line," %127[^=] =",key)==1) {
-            size_t n=strlen(key); while(n && (key[n-1]==' '||key[n-1]=='\t')) key[--n]=0;
-            if (!strcmp(key,"output_res")||!strcmp(key,"aspect_ratio")||!strcmp(key,"live_resolution")) continue;
-        }
-        fputs(line,out);
-    }
-    if(in) fclose(in);
-    fprintf(out,"\noutput_res=%dx%d\naspect_ratio=auto\nlive_resolution=0\n",width,height);
-    if(fclose(out)) { unlink(temp); return -1; }
-    return rename(temp,path);
-}
-static int screen_profile(SDL_Window *window,const char *config) {
-    int width=0,height=0;
-    if (!SDL_GetWindowSizeInPixels(window,&width,&height)||width<=0||height<=0) return -1;
-    if(height>width) { int t=width;width=height;height=t; }
-    /* Guest half-resolution surfaces require even dimensions; current iPhone panels are even. */
-    width &= ~1; height &= ~1;
-    if(width<640||height<360) return -1;
-    char resolution[64]; snprintf(resolution,sizeof(resolution),"%dx%d",width,height);
-    if(display_profile(config,width,height)) return -1;
-    setenv("BB_OUTPUT_RES",resolution,1); setenv("BB_RENDER_RES",resolution,1);
-    printf("iOS native display: %s, aspect %.9f, fullscreen, automatic projection\n",resolution,(double)width/height);
-    return 0;
-}
 
 int main(int argc,char **argv) {
     (void)argc; (void)argv;
@@ -64,6 +33,8 @@ int main(int argc,char **argv) {
     setenv("BB_USER_DIR",user,1);
     setenv("BB_JIT","0",1);
     setenv("BB_METAL_FRAME","1",1);
+    setenv("BB_FULLSCREEN","1",1);
+    setenv("BB_RETINA","1",1);
     setenv("BB_METAL_NATIVE_BOOT","1",1);
     setenv("BB_GFX_BACKEND","metal",1);
     setenv("BB_POOL_SPLIT","0",1);
@@ -116,7 +87,7 @@ int main(int argc,char **argv) {
         snprintf(display_text,sizeof(display_text),"Native display: %d x %d pixels, aspect %.5f",pixel_width,pixel_height,pixel_height ? (double)pixel_width/pixel_height : 0.0);
         SDL_RenderDebugText(renderer,40,440,display_text);
         SDL_RenderPresent(renderer);
-        if (start&&ready && !screen_profile(window,config)) break;
+        if (start&&ready && !bb_ios_screen_profile(window,config)) break;
         start=0; SDL_Delay(33);
     }
     SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window);

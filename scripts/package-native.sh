@@ -12,6 +12,7 @@ plutil -replace UIViewControllerBasedStatusBarAppearance -bool NO "$app/Info.pli
 export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 export PKG_CONFIG_SYSROOT_DIR=
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -I"$prefix/include" -c native/main.c -o output/native-main.o
+xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -I"$prefix/include" -c native/display.c -o output/native-display.o
 archives=("$prefix"/lib/*.a)
 gpuarchives=()
 while IFS= read -r archive; do
@@ -19,7 +20,7 @@ while IFS= read -r archive; do
 done < <(find "$runtime/out/ios/gpu" -type f -name '*.a')
 # Upstream libraries only: generated game code is never linked into a public artifact.
 xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 \
-  output/native-main.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
+  output/native-main.o output/native-display.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
   "${gpuarchives[@]}" "${archives[@]}" $(pkg-config --libs --static sdl3 libavformat libavcodec libavutil libswscale libswresample) \
   -framework UIKit -framework Foundation -framework Metal -framework QuartzCore \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework VideoToolbox \
