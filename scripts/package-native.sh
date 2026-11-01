@@ -5,6 +5,10 @@ prefix="$runtime/deps/ios-arm64"
 app="$PWD/output/Payload/BloodborneIOS.app"
 mkdir -p "$app/Licenses"
 cp native/Info.plist "$app/Info.plist"
+mkdir -p "$app/patches"
+cp "$runtime/patches/Bloodborne.xml" "$app/patches/Bloodborne.xml"
+plutil -replace UIStatusBarHidden -bool YES "$app/Info.plist"
+plutil -replace UIViewControllerBasedStatusBarAppearance -bool NO "$app/Info.plist"
 export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 export PKG_CONFIG_SYSROOT_DIR=
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -I"$prefix/include" -c native/main.c -o output/native-main.o
@@ -30,6 +34,7 @@ for dir in "$runtime" "$runtime/recomp" "$runtime/third_party/LibAtrac9" "$runti
   done
 done
 git -C "$runtime" rev-parse HEAD > "$app/Licenses/runtime-source-version.txt"
+git -C "$runtime/recomp" rev-parse HEAD > "$app/Licenses/recompiler-source-version.txt"
 cp README.md "$app/Licenses/build-notes.md"
 codesign --remove-signature "$app/BloodborneIOS" 2>/dev/null || true
 xcrun strip -S "$app/BloodborneIOS"
