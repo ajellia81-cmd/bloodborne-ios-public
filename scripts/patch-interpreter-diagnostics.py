@@ -48,3 +48,47 @@ text = text.replace(old, "const CodeRange *range = fault_range(context);\n    if
 text = text.replace(old, "const CodeRange *range = fault_range(context);\n    if (!range) return bbios_interpreter_fault(out, size);", 1)
 jit.write_text(text)
 print("Interpreter terminating-fault register and guest-stack reporting enabled")
+
+# Observe allocator initialization and the failing arena without altering guest state.
+probe = Path("upstream-runtime/src/probe.c")
+text = probe.read_text()
+marker = "static void fault(int sig, siginfo_t *info, void *context) {"
+assert text.count(marker) == 1
+observer = r'''
+#ifdef BB_HAVE_BBCPU
+static void bbios_heap_probe(const uint64_t regs[16], uint64_t address, uint32_t tag) {
+    static unsigned counts[4];
+    const uint64_t object = (tag == 1 || tag == 2) ? regs[3] : regs[7];
+    if (tag == 3 && object != bb_image_base + UINT64_C(0x569cdf8)) return;
+    const unsigned count = __atomic_fetch_add(&counts[tag], 1, __ATOMIC_RELAXED);
+    if (count >= 32) return;
+    uint64_t fields[24] = {0}, caller = 0;
+    const size_t got = bb_read_memory(fields, object, sizeof(fields));
+    (void)bb_read_memory(&caller, regs[4], sizeof(caller));
+    fprintf(stderr, "Heap trace tag=%u site=%#llx object=%#llx thread=%s caller=%#llx "
+        "rsi=%#llx rdx=%#llx rcx=%#llx rax=%#llx readable=%zu\n",
+        tag, (unsigned long long)(address - bb_image_base),
+        (unsigned long long)object, runtime_thread_name(),
+        (unsigned long long)(caller - bb_image_base),
+        (unsigned long long)regs[6], (unsigned long long)regs[2],
+        (unsigned long long)regs[1], (unsigned long long)regs[0], got);
+    for (size_t i = 0; i < got / 8; ++i)
+        fprintf(stderr, "  heap[%#zx]=%#llx%s", i * 8,
+            (unsigned long long)fields[i], i % 4 == 3 ? "\n" : "");
+    if ((got / 8) % 4) fputc('\n', stderr);
+}
+static void bbios_heap_probes(void) {
+    bbcpu_set_probe(bb_image_base + 0x2087e50, bbios_heap_probe, 0);
+    bbcpu_set_probe(bb_image_base + 0x2087f83, bbios_heap_probe, 1);
+    bbcpu_set_probe(bb_image_base + 0x2087f8b, bbios_heap_probe, 2);
+    bbcpu_set_probe(bb_image_base + 0x2088030, bbios_heap_probe, 3);
+    puts("Heap diagnostics: allocator init, metadata allocation and failing arena observed");
+}
+#endif
+
+'''
+text = text.replace(marker, observer + marker)
+marker = "        bbcpu_set_tls_displacement(tls_displacement);"
+assert text.count(marker) == 1
+text = text.replace(marker, marker + "\n        bbios_heap_probes();")
+probe.write_text(text)
