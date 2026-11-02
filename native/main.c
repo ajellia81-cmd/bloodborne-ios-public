@@ -16,7 +16,7 @@ static int exists(const char *p) { return access(p,R_OK)==0; }
 int main(int argc,char **argv) {
     (void)argc; (void)argv;
     char root[4096],game[4096],boot[4096],user[4096],xml[4096],content[4096],config[4096],log[4096];
-    snprintf(root,sizeof(root),"%s/Documents/Bloodborne",getenv("HOME"));
+    snprintf(root,sizeof(root),"%s/Documents/Bloodborne",getenv("HOME") ? getenv("HOME") : ".");
     mkdir(root,0700);
     snprintf(game,sizeof(game),"%s/game",root);
     snprintf(boot,sizeof(boot),"%s/boot-linked.bin",root);
@@ -25,8 +25,10 @@ int main(int argc,char **argv) {
     snprintf(config,sizeof(config),"%s/bbport.ini",root);
     snprintf(log,sizeof(log),"%s/runtime.log",root);
     mkdir(user,0700);
-    freopen(log,"a",stdout); setvbuf(stdout,NULL,_IONBF,0);
-    dup2(fileno(stdout),STDERR_FILENO);
+    if (freopen(log,"a",stdout)) {
+        setvbuf(stdout,NULL,_IONBF,0);
+        dup2(fileno(stdout),STDERR_FILENO);
+    }
     puts("Bloodborne iOS experimental runtime; game execution unverified.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
@@ -46,14 +48,21 @@ int main(int argc,char **argv) {
     setenv("BB_FPS_LIMIT","30",1);
     setenv("BB_UPSCALER","off",1);
     SDL_SetHint(SDL_HINT_ORIENTATIONS,"LandscapeLeft LandscapeRight");
-    if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMEPAD)) return 1;
+    puts("startup: entering SDL_Init");
+    if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMEPAD)) {
+        fprintf(stderr,"SDL_Init failed: %s\n",SDL_GetError()); return 1;
+    }
+    puts("startup: SDL initialized");
     const char *base=SDL_GetBasePath();
-    if(!base) return 1;
+    if(!base) { fprintf(stderr,"SDL_GetBasePath failed: %s\n",SDL_GetError()); return 1; }
     snprintf(xml,sizeof(xml),"%spatches/Bloodborne.xml",base);
     setenv("BB_PATCHES_XML",xml,1);
     setenv("BB_DATA_DIR",root,1);
     SDL_Window *window=NULL; SDL_Renderer *renderer=NULL;
-    if (!SDL_CreateWindowAndRenderer("Bloodborne iOS - Experimental",0,0,SDL_WINDOW_FULLSCREEN|SDL_WINDOW_HIGH_PIXEL_DENSITY,&window,&renderer)) return 1;
+    if (!SDL_CreateWindowAndRenderer("Bloodborne iOS - Experimental",960,540,SDL_WINDOW_FULLSCREEN|SDL_WINDOW_HIGH_PIXEL_DENSITY,&window,&renderer)) {
+        fprintf(stderr,"SDL window/renderer failed: %s\n",SDL_GetError()); return 1;
+    }
+    puts("startup: launcher renderer created");
     SDL_SetRenderLogicalPresentation(renderer,0,0,SDL_LOGICAL_PRESENTATION_DISABLED);
     int start=0;
     for (;;) {
