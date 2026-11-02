@@ -20,7 +20,7 @@ python3 - "$app/Info.plist" <<'PY'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,"rb") as f: info=plistlib.load(f)
-info["CFBundleVersion"]="5"
+info["CFBundleVersion"]="6"
 info["CFBundleName"]="Bloodborne"
 info["CFBundleDisplayName"]="Bloodborne"
 info["CFBundleIcons"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60"],"UIPrerenderedIcon":False}}
@@ -33,6 +33,8 @@ export PKG_CONFIG_SYSROOT_DIR=
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -I"$prefix/include" -c native/main.c -o output/native-main.o
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -I"$prefix/include" -c native/display.c -o output/native-display.o
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -c native/diagnostics.c -o output/native-diagnostics.o
+python3 scripts/trace-initializers.py generate output/init-trace.c
+xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -c output/init-trace.c -o output/init-trace.o
 archives=("$prefix"/lib/*.a)
 gpuarchives=()
 while IFS= read -r archive; do
@@ -40,7 +42,7 @@ while IFS= read -r archive; do
 done < <(find "$runtime/out/ios/gpu" -type f -name '*.a')
 # Upstream libraries only: generated game code is never linked into a public artifact.
 xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 \
-  output/native-diagnostics.o output/native-main.o output/native-display.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
+  output/native-diagnostics.o output/init-trace.o output/native-main.o output/native-display.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
   "${gpuarchives[@]}" "${archives[@]}" $(pkg-config --libs --static sdl3 libavformat libavcodec libavutil libswscale libswresample) \
   -framework UIKit -framework Foundation -framework Metal -framework QuartzCore \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework VideoToolbox \
@@ -71,6 +73,8 @@ for _ in range(struct.unpack_from("<I",b,16)[0]):
 assert inits>0, "static initializers must be preserved"
 print("LiveContainer link layout: standard guard segment, no chained fixups; preserved",inits,"initializers")
 PY
+
+python3 scripts/trace-initializers.py patch "$app/BloodborneIOS" output/initializer-map.txt
 
 for dir in "$runtime" "$runtime/recomp" "$runtime/third_party/LibAtrac9" "$runtime"/deps/build/src/*; do
   for notice in "$dir"/LICENSE "$dir"/LICENSE.txt "$dir"/LICENSE.md "$dir"/COPYING; do
