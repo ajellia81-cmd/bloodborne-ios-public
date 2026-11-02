@@ -10,23 +10,23 @@ cp "$runtime/patches/Bloodborne.xml" "$app/patches/Bloodborne.xml"
 plutil -replace UIStatusBarHidden -bool YES "$app/Info.plist"
 plutil -replace UIViewControllerBasedStatusBarAppearance -bool NO "$app/Info.plist"
 
-# Reuse the original Bloodborne-native launcher's iOS icons without resizing.
-icon_revision=66a66f60c9f039d0b9440fd3f355deed0fb5b839
-icon_base="https://raw.githubusercontent.com/bloodborne-native/bloodborne-launcher/$icon_revision/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset"
-curl --fail --location "$icon_base/AppIcon-60x60@2x.png" -o "$app/AppIcon60x60@2x.png"
-curl --fail --location "$icon_base/AppIcon-60x60@3x.png" -o "$app/AppIcon60x60@3x.png"
-curl --fail --location "$icon_base/AppIcon-76x76@2x.png" -o "$app/AppIcon76x76@2x.png"
-curl --fail --location "$icon_base/AppIcon-83.5x83.5@2x.png" -o "$app/AppIcon83.5x83.5@2x.png"
+# User-supplied artwork, cropped to square and resized for iOS icons.
+base64 --decode < native/AppIcon.jpg.base64 > output/AppIcon.jpg
+sips -s format png -z 120 120 output/AppIcon.jpg --out "$app/AppIcon60x60@2x.png" >/dev/null
+sips -s format png -z 180 180 output/AppIcon.jpg --out "$app/AppIcon60x60@3x.png" >/dev/null
+sips -s format png -z 152 152 output/AppIcon.jpg --out "$app/AppIcon76x76@2x.png" >/dev/null
+sips -s format png -z 167 167 output/AppIcon.jpg --out "$app/AppIcon83.5x83.5@2x.png" >/dev/null
 python3 - "$app/Info.plist" <<'PY'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,"rb") as f: info=plistlib.load(f)
-info["CFBundleVersion"]="3"
+info["CFBundleVersion"]="4"
+info["CFBundleName"]="Bloodborne"
+info["CFBundleDisplayName"]="Bloodborne"
 info["CFBundleIcons"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60"],"UIPrerenderedIcon":False}}
 info["CFBundleIcons~ipad"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60","AppIcon76x76","AppIcon83.5x83.5"],"UIPrerenderedIcon":False}}
 with open(p,"wb") as f: plistlib.dump(info,f)
 PY
-printf '%s\n' "$icon_revision" > "$app/Licenses/launcher-icon-source-version.txt"
 
 export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 export PKG_CONFIG_SYSROOT_DIR=
