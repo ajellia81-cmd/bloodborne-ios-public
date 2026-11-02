@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 90
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
@@ -38,7 +38,7 @@ jobs:
           path: |
             upstream-runtime/deps/ios-arm64
             upstream-runtime/deps/build-ios
-          key: ios-metal-xcode26.3-${{ hashFiles('upstream-runtime/deps/packages.cmake', 'upstream-runtime/scripts/ios/build-deps.sh') }}
+          key: ios-metal-xcode26.3-${{ runner.arch }}-${{ hashFiles('upstream-runtime/deps/packages.cmake', 'upstream-runtime/scripts/ios/build-deps.sh') }}
       - name: Fetch pinned iOS dependency sources
         run: python3 scripts/fetch-ios-deps.py
       - name: Build upstream iOS dependency libraries
@@ -75,7 +75,7 @@ jobs:
       - name: Build actual runtime without GPU stubs
         run: |
           set -euo pipefail
-          /opt/homebrew/bin/bash upstream-runtime/scripts/ios/build-core.sh 2>&1 | tee output/core-build.log
+          "$(brew --prefix)/bin/bash" upstream-runtime/scripts/ios/build-core.sh 2>&1 | tee output/core-build.log
           cp upstream-runtime/out/ios/libbbios.a output/
           cp upstream-runtime/out/ios/gpu/libbbgpu.a output/
       - name: Package full native runtime unsigned IPA
