@@ -6,6 +6,7 @@ cpu = root / "cpu.c"
 text = cpu.read_text()
 assert "uint64_t bbcpu_guest_rip(void)" in text
 text += r'''
+extern uint64_t bb_image_base __attribute__((weak));
 /* iOS diagnostic snapshot: do not allocate a CPU from a signal handler. */
 int bbios_interpreter_regs(BbGuestRegs *regs) {
     if (!tls_cpu) return 0;
@@ -20,7 +21,7 @@ int bbios_interpreter_fault(char *out, size_t size) {
         "  interpreter guest snapshot rip=%#llx (guest offset %#llx)\n"
         "  interpreter state may be a call continuation when faulting inside a host import\n",
         (unsigned long long)regs.rip,
-        (unsigned long long)(regs.rip - bb_image_base_for_reports()));
+        (unsigned long long)(regs.rip - (&bb_image_base ? bb_image_base : 0)));
     static const char *names[16] = {
         "rax","rcx","rdx","rbx","rsp","rbp","rsi","rdi",
         "r8","r9","r10","r11","r12","r13","r14","r15"
