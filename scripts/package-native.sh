@@ -40,14 +40,14 @@ while IFS= read -r archive; do
 done < <(find "$runtime/out/ios/gpu" -type f -name '*.a')
 # Upstream libraries only: generated game code is never linked into a public artifact.
 xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 \
-  output/native-main.o output/native-display.o output/native-diagnostics.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
+  output/native-diagnostics.o output/native-main.o output/native-display.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
   "${gpuarchives[@]}" "${archives[@]}" $(pkg-config --libs --static sdl3 libavformat libavcodec libavutil libswscale libswresample) \
   -framework UIKit -framework Foundation -framework Metal -framework QuartzCore \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework VideoToolbox \
   -framework AudioToolbox -framework AVFoundation -framework GameController -framework CoreHaptics \
   -framework Security -framework SystemConfiguration -framework Accelerate \
   -lz -Wl,-export_dynamic -Wl,-no_fixup_chains \
-  -Wl,-init,_bb_diagnostic_init -Wl,-headerpad,0x1000 -Wl,-map,output/native-link-map.txt -o "$app/BloodborneIOS"
+  -Wl,-headerpad,0x1000 -Wl,-map,output/native-link-map.txt -o "$app/BloodborneIOS"
 
 # LiveContainer converts MH_EXECUTE to MH_DYLIB. Keep the leading guard segment; avoid
 # chained, offset-based initializers. LiveContainer rewrites the first zero-address segment.
