@@ -26,7 +26,7 @@ info["CFBundleIcons"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60
 info["CFBundleIcons~ipad"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60","AppIcon76x76","AppIcon83.5x83.5"],"UIPrerenderedIcon":False}}
 with open(p,"wb") as f: plistlib.dump(info,f)
 PY
-printf '%s\\n' "$icon_revision" > "$app/Licenses/launcher-icon-source-version.txt"
+printf '%s\n' "$icon_revision" > "$app/Licenses/launcher-icon-source-version.txt"
 
 export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 export PKG_CONFIG_SYSROOT_DIR=
@@ -57,11 +57,11 @@ for _ in range(struct.unpack_from("<I",b,16)[0]):
     cmd,size=struct.unpack_from("<II",b,p)
     assert cmd!=0x80000034, "chained fixups remain"
     if cmd==0x19:
-        name=b[p+8:p+24].split(b"\\0")[0]
+        name=b[p+8:p+24].split(b"\0")[0]
         assert name!=b"__PAGEZERO", "leading guard segment remains"
         for j in range(struct.unpack_from("<I",b,p+64)[0]):
             q=p+72+j*80
-            name=b[q:q+16].split(b"\\0")[0]
+            name=b[q:q+16].split(b"\0")[0]
             assert name!=b"__init_offsets", "offset initializers remain"
             if name==b"__mod_init_func":
                 inits+=struct.unpack_from("<Q",b,q+40)[0]//8
