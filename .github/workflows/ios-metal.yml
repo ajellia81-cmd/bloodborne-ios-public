@@ -24,7 +24,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p output
-          git clone --depth 1 https://github.com/bloodborne-native/bloodborne-runtime.git upstream-runtime
+          git init upstream-runtime
+          git -C upstream-runtime remote add origin https://github.com/bloodborne-native/bloodborne-runtime.git
+          git -C upstream-runtime fetch --depth 1 origin 14dbd84263b3a08d001eb7fb1128e98f4c5f2be9
+          git -C upstream-runtime checkout --detach FETCH_HEAD
           git -C upstream-runtime submodule update --init --depth 1 recomp third_party/LibAtrac9 gpu/third_party/imgui
           git -C upstream-runtime rev-parse HEAD | tee output/runtime-sha.txt
       - name: Install host shader tools
