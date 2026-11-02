@@ -36,6 +36,7 @@ int main(int argc,char **argv) {
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
     setenv("BB_JIT","0",1);
+    setenv("BB_IOS_PROGRESS","1",1);
     setenv("BB_METAL_FRAME","1",1);
     setenv("BB_FULLSCREEN","1",1);
     setenv("BB_RETINA","1",1);
