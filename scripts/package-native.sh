@@ -21,7 +21,7 @@ python3 - "$app/Info.plist" <<'PY'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,"rb") as f: info=plistlib.load(f)
-info["CFBundleVersion"]="2"
+info["CFBundleVersion"]="3"
 info["CFBundleIcons"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60"],"UIPrerenderedIcon":False}}
 info["CFBundleIcons~ipad"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60","AppIcon76x76","AppIcon83.5x83.5"],"UIPrerenderedIcon":False}}
 with open(p,"wb") as f: plistlib.dump(info,f)
@@ -45,11 +45,11 @@ xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework VideoToolbox \
   -framework AudioToolbox -framework AVFoundation -framework GameController -framework CoreHaptics \
   -framework Security -framework SystemConfiguration -framework Accelerate \
-  -lz -Wl,-export_dynamic -Wl,-no_fixup_chains -Wl,-pagezero_size,0 \
+  -lz -Wl,-export_dynamic -Wl,-no_fixup_chains \
   -Wl,-headerpad,0x1000 -Wl,-map,output/native-link-map.txt -o "$app/BloodborneIOS"
 
-# LiveContainer converts MH_EXECUTE to MH_DYLIB. Avoid the leading guard segment and
-# chained, offset-based initializer representation in this compatibility candidate.
+# LiveContainer converts MH_EXECUTE to MH_DYLIB. Keep the leading guard segment; avoid
+# chained, offset-based initializers. LiveContainer rewrites the first zero-address segment.
 python3 - "$app/BloodborneIOS" <<'PY'
 import struct,sys
 b=open(sys.argv[1],"rb").read(); p=32; inits=0
@@ -58,7 +58,8 @@ for _ in range(struct.unpack_from("<I",b,16)[0]):
     assert cmd!=0x80000034, "chained fixups remain"
     if cmd==0x19:
         name=b[p+8:p+24].split(b"\0")[0]
-        assert name!=b"__PAGEZERO", "leading guard segment remains"
+        if name==b"__PAGEZERO":
+            assert struct.unpack_from("<Q",b,p+56)[0]==0, "guard segment must have no file content"
         for j in range(struct.unpack_from("<I",b,p+64)[0]):
             q=p+72+j*80
             name=b[q:q+16].split(b"\0")[0]
@@ -67,7 +68,7 @@ for _ in range(struct.unpack_from("<I",b,16)[0]):
                 inits+=struct.unpack_from("<Q",b,q+40)[0]//8
     p+=size
 assert inits>0, "static initializers must be preserved"
-print("LiveContainer link layout: no PAGEZERO, no chained fixups; preserved",inits,"initializers")
+print("LiveContainer link layout: standard guard segment, no chained fixups; preserved",inits,"initializers")
 PY
 
 for dir in "$runtime" "$runtime/recomp" "$runtime/third_party/LibAtrac9" "$runtime"/deps/build/src/*; do
