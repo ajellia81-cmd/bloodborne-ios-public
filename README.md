@@ -1,6 +1,6 @@
 # Bloodborne iOS experimental runtime
 
-A game-free iOS shell for Bloodborne-native, built entirely with cloud tooling and GitHub Actions macOS runners. Target: iPhone 18 Pro Max. **Game execution on that device has not been verified.**
+A game-free iOS shell for Bloodborne-native, built entirely with cloud tooling and GitHub Actions macOS runners. Target: iPhone 18 Pro Max. **The launcher and early game initialization have run on the user's device. Gameplay has not been verified.**
 
 ## Verified results
 | Check | Result |
@@ -12,7 +12,9 @@ A game-free iOS shell for Bloodborne-native, built entirely with cloud tooling a
 | Actual native Metal GPU, core, app link and unsigned IPA packaging | Passed for the earlier fixed-resolution shell (run 40979870364) |
 | Native-display profile behavior | Passed: portrait normalization, landscape pixels, aspect auto and preservation of unrelated settings |
 | Updated native-display IPA | Passed: run 41284868696; unsigned iOS ARM64, bundled patch XML, system framework/library imports only |
-| Physical iPhone launch, game loading, Korean rendering, DLC, frame rate and memory | Not verified |
+| Physical-device launcher and early game initialization | User logs: build 7 reaches SDL, native Metal, game worker threads and audio initialization |
+| Game rendering and gameplay | Unresolved: GXRenderThread faults reading address 0x10 in the CPU interpreter |
+| Korean rendering, DLC, frame rate | Not verified |
 
 The earlier compiler failure in macos-on-ios used the runner's default Xcode 16.4 / SDK 18.5, which lacks Metal 4 declarations. The workflow explicitly selects Xcode 26.3. The upstream iOS core script also needs modern Bash to handle its empty GPU-stub array under nounset; the workflow uses Homebrew Bash.
 
@@ -66,3 +68,8 @@ Built on Bloodborne-native, bbport by deadinside28 and shadPS4. macos-on-ios is 
 - https://github.com/zorrobyte/macos-on-ios-public
 
 The native-display IPA was structurally validated after download: ZIP integrity, ARM64 CPU type, iOS Mach-O platform, no code-signature load command, landscape orientations, hidden status bar and bundled resolution patch XML. SHA256: 3822953e50149bce94038732b881042599036a0721890ee13f874b6d31c44e44. The latest shader scanner also requires zlib; the app link includes -lz. These checks do not substitute for physical-device or game testing.
+
+## Current device diagnostics
+Build 8 opens controllers connected before launch and on hotplug so SDL can deliver launcher button events. This change has not yet been verified on the physical device. The startup log is `Documents/Bloodborne/startup.log`; runtime output is `Documents/Bloodborne/runtime.log`. Terminating interpreter faults now report a guest register snapshot and guest stack using the existing safe-memory reader, in addition to the host backtrace. This is diagnostic reporting; it does not recover from or fix the graphics-thread fault.
+
+The pre-main startup abort was resolved by preparing the writable GPU user directory before the upstream static path initializer. Keep the leading Mach-O `__PAGEZERO` segment for LiveContainer conversion. Build 8 retains the user artwork and the display name `Bloodborne`.
