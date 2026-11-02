@@ -10,11 +10,13 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+void bb_diagnostic_mark(const char *stage);
 int bb_probe_main(int argc,char **argv);
 static int exists(const char *p) { return access(p,R_OK)==0; }
 
 int main(int argc,char **argv) {
     (void)argc; (void)argv;
+    bb_diagnostic_mark("SDL main entered: static initialization completed");
     char root[4096],game[4096],boot[4096],user[4096],xml[4096],content[4096],config[4096],log[4096];
     snprintf(root,sizeof(root),"%s/Documents/Bloodborne",getenv("HOME") ? getenv("HOME") : ".");
     mkdir(root,0700);
@@ -48,10 +50,12 @@ int main(int argc,char **argv) {
     setenv("BB_FPS_LIMIT","30",1);
     setenv("BB_UPSCALER","off",1);
     SDL_SetHint(SDL_HINT_ORIENTATIONS,"LandscapeLeft LandscapeRight");
+    bb_diagnostic_mark("entering SDL_Init");
     puts("startup: entering SDL_Init");
     if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMEPAD)) {
         fprintf(stderr,"SDL_Init failed: %s\n",SDL_GetError()); return 1;
     }
+    bb_diagnostic_mark("SDL_Init succeeded");
     puts("startup: SDL initialized");
     const char *base=SDL_GetBasePath();
     if(!base) { fprintf(stderr,"SDL_GetBasePath failed: %s\n",SDL_GetError()); return 1; }
@@ -62,6 +66,7 @@ int main(int argc,char **argv) {
     if (!SDL_CreateWindowAndRenderer("Bloodborne iOS - Experimental",960,540,SDL_WINDOW_FULLSCREEN|SDL_WINDOW_HIGH_PIXEL_DENSITY,&window,&renderer)) {
         fprintf(stderr,"SDL window/renderer failed: %s\n",SDL_GetError()); return 1;
     }
+    bb_diagnostic_mark("launcher renderer created");
     puts("startup: launcher renderer created");
     SDL_SetRenderLogicalPresentation(renderer,0,0,SDL_LOGICAL_PRESENTATION_DISABLED);
     int start=0;
@@ -104,5 +109,8 @@ int main(int argc,char **argv) {
     // A downloaded Documents dylib is not loaded: game AOT code must be embedded and re-signed
     // as part of a separate, personal build. Never publish generated game code.
     char *arguments[]={"BloodborneIOS",boot,"--app0",game,"--user",user,"--patches","-","--content-profile",content,"--timeout","0",NULL};
-    return bb_probe_main(12,arguments);
+    bb_diagnostic_mark("entering game runtime");
+    int result=bb_probe_main(12,arguments);
+    bb_diagnostic_mark("game runtime returned");
+    return result;
 }
