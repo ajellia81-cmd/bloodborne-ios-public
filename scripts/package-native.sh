@@ -20,7 +20,7 @@ python3 - "$app/Info.plist" <<'PY'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,"rb") as f: info=plistlib.load(f)
-info["CFBundleVersion"]="4"
+info["CFBundleVersion"]="5"
 info["CFBundleName"]="Bloodborne"
 info["CFBundleDisplayName"]="Bloodborne"
 info["CFBundleIcons"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60"],"UIPrerenderedIcon":False}}
@@ -32,6 +32,7 @@ export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 export PKG_CONFIG_SYSROOT_DIR=
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -I"$prefix/include" -c native/main.c -o output/native-main.o
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -I"$prefix/include" -c native/display.c -o output/native-display.o
+xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -c native/diagnostics.c -o output/native-diagnostics.o
 archives=("$prefix"/lib/*.a)
 gpuarchives=()
 while IFS= read -r archive; do
@@ -39,14 +40,14 @@ while IFS= read -r archive; do
 done < <(find "$runtime/out/ios/gpu" -type f -name '*.a')
 # Upstream libraries only: generated game code is never linked into a public artifact.
 xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 \
-  output/native-main.o output/native-display.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
+  output/native-main.o output/native-display.o output/native-diagnostics.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
   "${gpuarchives[@]}" "${archives[@]}" $(pkg-config --libs --static sdl3 libavformat libavcodec libavutil libswscale libswresample) \
   -framework UIKit -framework Foundation -framework Metal -framework QuartzCore \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework VideoToolbox \
   -framework AudioToolbox -framework AVFoundation -framework GameController -framework CoreHaptics \
   -framework Security -framework SystemConfiguration -framework Accelerate \
   -lz -Wl,-export_dynamic -Wl,-no_fixup_chains \
-  -Wl,-headerpad,0x1000 -Wl,-map,output/native-link-map.txt -o "$app/BloodborneIOS"
+  -Wl,-init,_bb_diagnostic_init -Wl,-headerpad,0x1000 -Wl,-map,output/native-link-map.txt -o "$app/BloodborneIOS"
 
 # LiveContainer converts MH_EXECUTE to MH_DYLIB. Keep the leading guard segment; avoid
 # chained, offset-based initializers. LiveContainer rewrites the first zero-address segment.
