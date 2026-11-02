@@ -23,8 +23,8 @@ static void caught(int sig, siginfo_t *info, void *context) {
     if(diagnostic_fd>=0) { write(diagnostic_fd,msg,sizeof(msg)-1); fsync(diagnostic_fd); }
     signal(sig,SIG_DFL); kill(getpid(),sig);
 }
-/* LC_ROUTINES_64: runs before the C++ initializer table. No Objective-C here. */
-void bb_diagnostic_init(void) {
+/* Linked before runtime archives so this logs before their C++ constructors. */
+__attribute__((constructor(101))) void bb_diagnostic_init(void) {
     if(entered) return; entered=1;
     const char *home=getenv("HOME");
     if(!home) return;
