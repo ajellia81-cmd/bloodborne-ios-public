@@ -43,6 +43,8 @@ int main(int argc,char **argv) {
     setenv("BB_GFX_BACKEND","metal",1);
     setenv("BB_POOL_SPLIT","0",1);
     setenv("BB_DMEM_MB","4608",1);
+    setenv("BB_AUTO_GRAPHICS_HEAP","0",1);
+    puts("iOS memory budget: retail graphics heaps; native viewport retained");
     setenv("BB_LANGUAGE","9",1);
     setenv("BB_UI_LANGUAGE","ko",1);
     setenv("BB_ONLINE","0",1);
