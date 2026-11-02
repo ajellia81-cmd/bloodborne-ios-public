@@ -7,6 +7,7 @@ on:
       - 'scripts/fetch-ios-deps.py'
       - 'scripts/package-native.sh'
       - 'scripts/patch-interpreter-diagnostics.py'
+      - 'scripts/patch-ios-memory-budget.py'
       - 'native/**'
 permissions:
   contents: read
@@ -76,6 +77,7 @@ jobs:
       - name: Build actual runtime without GPU stubs
         run: |
           set -euo pipefail
+          python3 scripts/patch-ios-memory-budget.py
           python3 scripts/patch-interpreter-diagnostics.py
           "$(brew --prefix)/bin/bash" upstream-runtime/scripts/ios/build-core.sh 2>&1 | tee output/core-build.log
           cp upstream-runtime/out/ios/libbbios.a output/
