@@ -57,6 +57,13 @@ int main(int argc,char **argv) {
     }
     bb_diagnostic_mark("SDL_Init succeeded");
     puts("startup: SDL initialized");
+    int gamepad_count=0;
+    SDL_JoystickID *gamepad_ids=SDL_GetGamepads(&gamepad_count);
+    for(int i=0;gamepad_ids && i<gamepad_count;i++) {
+        SDL_Gamepad *pad=SDL_OpenGamepad(gamepad_ids[i]);
+        fprintf(stdout,"Launcher gamepad %u: %s\n",(unsigned)gamepad_ids[i],pad ? SDL_GetGamepadName(pad) : SDL_GetError());
+    }
+    SDL_free(gamepad_ids);
     const char *base=SDL_GetBasePath();
     if(!base) { fprintf(stderr,"SDL_GetBasePath failed: %s\n",SDL_GetError()); return 1; }
     snprintf(xml,sizeof(xml),"%spatches/Bloodborne.xml",base);
@@ -73,6 +80,14 @@ int main(int argc,char **argv) {
     for (;;) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            if(event.type==SDL_EVENT_GAMEPAD_ADDED) {
+                SDL_Gamepad *pad=SDL_OpenGamepad(event.gdevice.which);
+                fprintf(stdout,"Launcher gamepad added: %s\n",pad ? SDL_GetGamepadName(pad) : SDL_GetError());
+            }
+            if(event.type==SDL_EVENT_GAMEPAD_REMOVED) {
+                SDL_Gamepad *pad=SDL_GetGamepadFromID(event.gdevice.which);
+                if(pad) SDL_CloseGamepad(pad);
+            }
             if (event.type==SDL_EVENT_QUIT) return 0;
             if (event.type==SDL_EVENT_FINGER_UP || event.type==SDL_EVENT_MOUSE_BUTTON_UP ||
                 (event.type==SDL_EVENT_GAMEPAD_BUTTON_UP && event.gbutton.button==SDL_GAMEPAD_BUTTON_SOUTH)) start=1;
