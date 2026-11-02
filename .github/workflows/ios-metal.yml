@@ -6,6 +6,7 @@ on:
       - '.github/workflows/ios-metal.yml'
       - 'scripts/fetch-ios-deps.py'
       - 'scripts/package-native.sh'
+      - 'scripts/patch-interpreter-diagnostics.py'
       - 'native/**'
 permissions:
   contents: read
@@ -75,6 +76,7 @@ jobs:
       - name: Build actual runtime without GPU stubs
         run: |
           set -euo pipefail
+          python3 scripts/patch-interpreter-diagnostics.py
           "$(brew --prefix)/bin/bash" upstream-runtime/scripts/ios/build-core.sh 2>&1 | tee output/core-build.log
           cp upstream-runtime/out/ios/libbbios.a output/
           cp upstream-runtime/out/ios/gpu/libbbgpu.a output/
