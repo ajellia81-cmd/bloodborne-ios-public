@@ -20,7 +20,7 @@ python3 - "$app/Info.plist" <<'PY'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,"rb") as f: info=plistlib.load(f)
-info["CFBundleVersion"]="7"
+info["CFBundleVersion"]="8"
 info["CFBundleName"]="Bloodborne"
 info["CFBundleDisplayName"]="Bloodborne"
 info["CFBundleIcons"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60"],"UIPrerenderedIcon":False}}
