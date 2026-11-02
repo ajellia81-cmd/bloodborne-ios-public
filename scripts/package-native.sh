@@ -59,7 +59,7 @@ for _ in range(struct.unpack_from("<I",b,16)[0]):
     if cmd==0x19:
         name=b[p+8:p+24].split(b"\0")[0]
         if name==b"__PAGEZERO":
-            assert struct.unpack_from("<Q",b,p+56)[0]==0, "guard segment must have no file content"
+            assert struct.unpack_from("<Q",b,p+48)[0]==0, "guard segment must have no file content"
         for j in range(struct.unpack_from("<I",b,p+64)[0]):
             q=p+72+j*80
             name=b[q:q+16].split(b"\0")[0]
