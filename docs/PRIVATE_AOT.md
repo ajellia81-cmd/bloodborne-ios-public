@@ -1,0 +1,15 @@
+# Private cloud AOT build notes
+
+Never commit or publish the executable, generated C, object files, personal library or personal IPA. Public Actions prepare only game-free compiler dependencies. Personalization runs outside public Actions in a separate cloud workspace.
+
+Validated source revisions: runtime `14dbd84263b3a08d001eb7fb1128e98f4c5f2be9`, recompiler `8f31ec7c41f252730c6325d52647046baef7549f`, Zydis v4.1.1 and LLVM 18.1.8 Linux x86_64. The two `cloud-aot-*` workflows prepare the game-free source/compiler archive and the official Ubuntu libtinfo5 dependency. Extract archives with `--no-same-owner`. Use the actual libtinfo5 library; a symlink to libtinfo6 fails its symbol-version check.
+
+For the Linux host tools, build Zydis and bundled Zycore static libraries with GCC. Compile the CPU and generator with `BB_HAVE_BBCPU=1` and `_GNU_SOURCE`; use `-lm -ldl -pthread -latomic` when linking bbrecomp. Keep the CPU headers and recompiler API pinned to the runtime. The macOS-oriented host build's unused-function warnings need not be fatal on Linux.
+
+Privately adapt `tools/recomp/build_library.py` from `arm64-apple-macos15` to `arm64-apple-ios26.0` in both compilation and linking. Retain `-O2`, `-ffp-contract=off`, `-fno-strict-aliasing` and the SDK-less headers. Set the recorded recompiler version to the pinned revision when the source archive lacks Git metadata. Run against the owner's eboot.bin in the private cloud workspace and retain objects/fingerprints for resuming. Run only one builder per work directory; concurrent builders race on partial object renames.
+
+The SDK-less Linux linker also needs a libSystem TAPI stub to resolve `dyld_stub_binder`; allowing the arithmetic/memory imports alone does not resolve the lazy-binding helper. Link a minimal `arm64`/`ios` TAPI v3 stub with install name `/usr/lib/libSystem.B.dylib` and the allowed symbols `_memcpy`, `_memset`, `_memmove`, `___divti3`, `___udivti3`, `___modti3`, `___umodti3`, and `dyld_stub_binder` using `-L<private-stub-dir> -lSystem`. The produced library required only the binder and three arithmetic helpers; the Xcode-linked base app already imports those arithmetic helpers from libSystem. Use `-Wl,-no_adhoc_codesign -Wl,-no_fixup_chains`, with install name `@rpath/librecomp.dylib`. Check all remaining undefined symbols explicitly.
+
+Bundle the private library at `Payload/BloodborneIOS.app/Frameworks/librecomp.dylib`. The shell sets `BB_RECOMP_LIB` when this file exists. Validate ARM64, iOS platform/minimum version, no LC_CODE_SIGNATURE, segment filesize not exceeding vmsize, exported `bb_recomp_init`, API compatibility and ZIP integrity before delivery. Keep the executable's leading PAGEZERO segment. The recipient's signing/LiveContainer flow still signs the unsigned package for execution.
+
+At boot, use the runtime's `Recompiled: ... game functions replaced` line to establish actual activation. Presence of the library or successful linking alone is insufficient. Compare device loading time and gameplay FPS; do not use Metal draw/dispatch counts as FPS. No device performance result has been claimed for this personal build.
