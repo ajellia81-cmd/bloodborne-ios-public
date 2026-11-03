@@ -78,6 +78,8 @@ static void bbios_heap_probe(const uint64_t regs[16], uint64_t address, uint32_t
     if ((got / 8) % 4) fputc('\n', stderr);
 }
 static void bbios_heap_probes(void) {
+    const char *enabled = getenv("BB_HEAP_TRACE");
+    if (!enabled || strcmp(enabled, "1")) return;
     bbcpu_set_probe(bb_image_base + 0x2087e50, bbios_heap_probe, 0);
     bbcpu_set_probe(bb_image_base + 0x2087f83, bbios_heap_probe, 1);
     bbcpu_set_probe(bb_image_base + 0x2087f8b, bbios_heap_probe, 2);
