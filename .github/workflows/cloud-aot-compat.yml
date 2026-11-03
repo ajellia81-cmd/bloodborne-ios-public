@@ -1,0 +1,30 @@
+name: Prepare AOT compatibility dependency
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/cloud-aot-compat.yml']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: macos-15-intel
+    steps:
+      - name: Fetch official Ubuntu libtinfo5 package
+        run: |
+          mkdir -p output
+          python3 - <<'PY'
+          import urllib.request,re,hashlib,pathlib
+          base='https://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/'
+          html=urllib.request.urlopen(base).read().decode()
+          names=sorted(set(re.findall(r'href="(libtinfo5_[^"]+_amd64.deb)"',html)))
+          assert names, 'Official package missing'
+          name=names[-1]
+          data=urllib.request.urlopen(base+name).read()
+          pathlib.Path('output/libtinfo5.deb').write_bytes(data)
+          pathlib.Path('output/source.txt').write_text(base+name+'\n'+hashlib.sha256(data).hexdigest()+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aot-linux-compat
+          path: output/
+          retention-days: 7
