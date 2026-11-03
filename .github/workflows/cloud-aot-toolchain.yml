@@ -1,0 +1,44 @@
+name: Prepare cloud AOT toolchain
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/cloud-aot-toolchain.yml'
+permissions:
+  contents: read
+concurrency:
+  group: cloud-aot-toolchain
+  cancel-in-progress: true
+jobs:
+  prepare:
+    runs-on: macos-15-intel
+    timeout-minutes: 40
+    steps:
+      - name: Fetch game-free compiler and source dependencies
+        run: |
+          set -euo pipefail
+          mkdir -p output source compiler
+          git init source/recomp
+          git -C source/recomp remote add origin https://github.com/bloodborne-native/bloodborne-recomp.git
+          git -C source/recomp fetch --depth 1 origin 8f31ec7c41f252730c6325d52647046baef7549f
+          git -C source/recomp checkout --detach FETCH_HEAD
+          git clone --depth 1 --recursive -b v4.1.1 https://github.com/zyantific/zydis.git source/zydis
+          curl -fL --retry 3 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang%2Bllvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz' -o llvm.tar.xz
+          shasum -a 256 llvm.tar.xz > output/llvm-download-sha256.txt
+          tar -xJf llvm.tar.xz -C compiler
+          mv compiler/clang+llvm-* compiler/llvm
+          mkdir -p kit/llvm/bin kit/llvm/lib/clang/18 kit/source
+          cp -a compiler/llvm/bin/clang compiler/llvm/bin/clang-18 compiler/llvm/bin/lld compiler/llvm/bin/ld64.lld kit/llvm/bin/
+          cp -a compiler/llvm/lib/clang/18/include kit/llvm/lib/clang/18/
+          find compiler/llvm/lib -maxdepth 1 -name '*.so*' -exec cp -a {} kit/llvm/lib/ \;
+          cp -a source/recomp source/zydis kit/source/
+          find kit -type d -name .git -prune -exec rm -rf {} +
+          cp compiler/llvm/LICENSE.TXT kit/llvm/ 2>/dev/null || true
+          printf '%s\n' 'No game data. LLVM 18.1.8 Linux x86_64; recompiler 8f31ec7c41f252730c6325d52647046baef7549f; Zydis v4.1.1.' > kit/SOURCES.txt
+          tar -czf output/cloud-aot-toolchain.tar.gz kit
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-aot-game-free-toolchain
+          path: output/
+          retention-days: 7
+          compression-level: 0
