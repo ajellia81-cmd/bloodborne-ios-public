@@ -92,3 +92,26 @@ s = s.replace(needle, r'''
         std::vector<const char*> candidates;''')
 p.write_text(s)
 print("Touch/menu: pre-input safe-area geometry, direct finger events, close button, bundled CJK font")
+
+# Use Guide as the exclusive controller menu toggle, preserving L3/R3 for gameplay.
+p = gpu / "bbport_overlay.cpp"
+s = p.read_text()
+old = '''        if (button == SDL_GAMEPAD_BUTTON_LEFT_STICK) {
+            l3_down = down;
+        } else if (button == SDL_GAMEPAD_BUTTON_RIGHT_STICK) {
+            r3_down = down;
+        }
+        if (down && l3_down && r3_down) {
+            SetOpen(!is_open);
+            return true;
+        }'''
+new = '''        if (button == SDL_GAMEPAD_BUTTON_GUIDE) {
+            if (down) SetOpen(!is_open);
+            return true;
+        }'''
+assert s.count(old) == 1
+s = s.replace(old, new)
+s = s.replace("bool l3_down = false, r3_down = false;\n", "")
+s = s.replace("L3+R3", "Guide")
+p.write_text(s)
+print("Controller settings toggle: Guide; L3/R3 remain game inputs")
