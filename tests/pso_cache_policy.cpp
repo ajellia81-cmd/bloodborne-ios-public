@@ -10,7 +10,7 @@ using namespace std::chrono_literals;
 int main(){
     using namespace BbIosPso;
     assert(!Eligible(0)&&Eligible(MaxEntry)&&!Eligible(MaxEntry+1));
-    assert(CanQueue(7)&&!CanQueue(8)&&!CanQueue(100));
+    assert(CanQueue(63)&&!CanQueue(64)&&!CanQueue(100));
     Flights flights;std::atomic<bool> go=false,cached=false;std::atomic<int> builds=0;
     std::vector<std::thread> threads;
     for(int i=0;i<64;++i)threads.emplace_back([&]{

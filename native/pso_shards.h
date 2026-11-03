@@ -131,7 +131,7 @@ public:
             }else if(path.extension()==".tmp"){std::filesystem::remove(path,ec);ec.clear();}
         }
         Sweep();on=true;writer=std::thread{[this]{Loop();}};
-        std::puts("iOS PSO cache: bounded shards enabled; entry <=1 MiB, disk budget 128 MiB/2048 entries, queue <=8; no bulk archive loaded");
+        std::puts("iOS PSO cache: bounded shards enabled; entry <=1 MiB, disk budget 128 MiB/2048 entries, queue <=64; no bulk archive loaded");
 #else
         (void)cache;
 #endif
