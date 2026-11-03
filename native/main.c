@@ -33,7 +33,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 16; guarded Korean Default mapping, bounded noncritical GC, streaming timings.");
+    puts("Bloodborne iOS build 17; Korean Default, bounded per-pipeline Metal cache and same-key build coalescing.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
@@ -41,7 +41,8 @@ int main(int argc,char **argv) {
     setenv("BB_IOS_PROGRESS","0",1);
     setenv("BB_METAL_FRAME","1",1);
     setenv("BB_METAL_ARCHIVE","0",1);
-    puts("iOS memory: Metal binary archive disabled; native output retained");
+    setenv("BB_IOS_PSO_SHARDS","1",1);
+    puts("iOS memory: monolithic archive off; bounded per-pipeline disk cache enabled");
     setenv("BB_FULLSCREEN","1",1);
     setenv("BB_RETINA","1",1);
     setenv("BB_METAL_NATIVE_BOOT","1",1);
@@ -151,6 +152,7 @@ int main(int argc,char **argv) {
     bb_diagnostic_mark("game runtime returned");
     return result;
 }
+
 
 
 

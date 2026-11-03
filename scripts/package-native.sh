@@ -28,7 +28,7 @@ python3 - "$app/Info.plist" <<'PY'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,"rb") as f: info=plistlib.load(f)
-info["CFBundleVersion"]="16"
+info["CFBundleVersion"]="17"
 info["UIApplicationSupportsIndirectInputEvents"]=True
 info["CFBundleName"]="Bloodborne"
 info["CFBundleDisplayName"]="Bloodborne"
@@ -104,6 +104,7 @@ file "$app/BloodborneIOS" | tee output/native-binary.txt
 xcrun vtool -show-build "$app/BloodborneIOS" | tee output/native-platform.txt
 otool -L "$app/BloodborneIOS" | tee output/native-linkage.txt
 (cd output && zip -qr Bloodborne-iOS-experimental-unsigned.ipa Payload)
+
 
 
 

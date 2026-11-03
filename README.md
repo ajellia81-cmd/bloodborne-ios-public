@@ -1,5 +1,16 @@
 # Bloodborne iOS experimental runtime
 
+## Build 17 — pipeline cache candidate, device verification pending
+
+- Build 16 device feedback confirmed Korean Default works. The latest device log measured individual Metal pipeline creations up to 262.22 ms, versus texture collection calls up to 1.82 ms. First-use pipeline creation is a confirmed source of long blocking work; texture uploads and other stages may also contribute.
+- Cache individual Metal pipeline descriptors in device-local binary archive shards. Read one shard at a time and release the archive reference after the lookup; the monolithic archive stays disabled. Oversized or invalid shards fall back to normal creation. GPU/OS cache namespaces, a loading marker and failed-entry removal limit reuse of invalid data.
+- Serialized entry limit: 1 MiB. Per-namespace disk budget: 128 MiB / 2048 entries. At most eight queued descriptors and one writer. Cache IO is skipped below 512 MiB reported allocation headroom. These are file/queue limits, not a verified cap on the Metal driver's resident memory.
+- Write descriptor snapshots on a utility worker after a two-second quiet interval, with no foreground pipeline creation in progress at the time the writer takes a job. A new foreground creation can begin while a write is already in progress.
+- Coalesce concurrent creation of the same render, compute, tessellation or geometry map key. Recheck the original exact-key map after waiting; unrelated keys proceed independently. Do not skip draws or substitute a mismatched pipeline.
+- Newly encountered pipelines can still compile synchronously. Improvements are expected primarily for cached pipelines across launches and duplicate concurrent requests. No claim of eliminating all first-visit stutter or of verified device memory behavior.
+- Device-created shader caches and personal AOT code are not included in this public repository or Actions artifacts. Korean selection, output resolution, input and lifecycle fixes continue from build 16.
+
+
 ## Build 16 — compiled successfully; device verification pending
 
 - Default Korean now corrects the game's regional mapping for Korean index 19 after a complete resolver layout hash check. It preserves the other 20 mappings and covers inlined resolver copies without modifying the personal AOT library.
@@ -127,4 +138,5 @@ Per the owner's requested semantics, only the game's Default/system language is 
 Cloud fixture tests distinguish an empty locale folder from readable message archives and verify that no global locale override is enabled. Display tests cover native output, a half-size internal scene, MetalFX configuration, portrait normalization and small-display fallback.
 
 Build 15 final CI run `41627006284`, code revision `a706050882cc263518e7513149a23031c87db6c8`, passed. The strict macOS fixture's mkdtemp declaration was fixed with the Darwin feature macro. The downloaded display test confirms 2868x1320 output with a 1434x660 MetalFX scene. The private unsigned package passed ARM64/iOS platform checks, segment bounds, PAGEZERO/signature/fixup checks, preserved AOT identity and ZIP integrity. The locale diagnostic symbols are present and the removed global-remap symbol is absent. Cutscene/world-entry stability and actual Default-language Korean rendering are still awaiting device verification.
+
 
