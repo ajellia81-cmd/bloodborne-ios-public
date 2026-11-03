@@ -36,7 +36,7 @@ int main(int argc,char **argv) {
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
     setenv("BB_JIT","0",1);
-    setenv("BB_IOS_PROGRESS","1",1);
+    setenv("BB_IOS_PROGRESS","0",1);
     setenv("BB_METAL_FRAME","1",1);
     setenv("BB_FULLSCREEN","1",1);
     setenv("BB_RETINA","1",1);
@@ -48,6 +48,7 @@ int main(int argc,char **argv) {
     puts("iOS memory budget: retail graphics heaps; native viewport retained");
     setenv("BB_LANGUAGE","9",1);
     setenv("BB_UI_LANGUAGE","ko",1);
+    setenv("BB_UI_SCALE","1.75",1);
     setenv("BB_ONLINE","0",1);
     setenv("BB_FPS","30",1);
     setenv("BB_FPS_LIMIT","30",1);
@@ -70,6 +71,9 @@ int main(int argc,char **argv) {
     const char *base=SDL_GetBasePath();
     if(!base) { fprintf(stderr,"SDL_GetBasePath failed: %s\n",SDL_GetError()); return 1; }
     snprintf(xml,sizeof(xml),"%spatches/Bloodborne.xml",base);
+    char cjk_font[4096];
+    snprintf(cjk_font,sizeof(cjk_font),"%sFonts/NotoSansKR.ttf",base);
+    setenv("BB_CJK_FONT",cjk_font,1);
     setenv("BB_PATCHES_XML",xml,1);
     setenv("BB_DATA_DIR",root,1);
     SDL_Window *window=NULL; SDL_Renderer *renderer=NULL;
