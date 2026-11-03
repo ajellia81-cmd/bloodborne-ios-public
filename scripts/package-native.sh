@@ -5,6 +5,14 @@ prefix="$runtime/deps/ios-arm64"
 app="$PWD/output/Payload/BloodborneIOS.app"
 mkdir -p "$app/Licenses"
 cp native/Info.plist "$app/Info.plist"
+
+# Pinned Google Fonts Noto Sans KR (SIL OFL); verify Git blob identities.
+mkdir -p "$app/Fonts"
+curl -fsSL --retry 3 'https://raw.githubusercontent.com/google/fonts/b38c5c93af322c45f633e17ac440ec1e6c94d489/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf' -o "$app/Fonts/NotoSansKR.ttf"
+test "$(git hash-object "$app/Fonts/NotoSansKR.ttf")" = b386890ba945e1f39448a6b59f20c5d194f58808
+curl -fsSL --retry 3 'https://raw.githubusercontent.com/google/fonts/b38c5c93af322c45f633e17ac440ec1e6c94d489/ofl/notosanskr/OFL.txt' -o "$app/Licenses/NotoSansKR-OFL.txt"
+test "$(git hash-object "$app/Licenses/NotoSansKR-OFL.txt")" = 1c9f43281b8f216c5461fe9ac729afbade7724e4
+
 mkdir -p "$app/patches"
 cp "$runtime/patches/Bloodborne.xml" "$app/patches/Bloodborne.xml"
 plutil -replace UIStatusBarHidden -bool YES "$app/Info.plist"
@@ -20,7 +28,7 @@ python3 - "$app/Info.plist" <<'PY'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,"rb") as f: info=plistlib.load(f)
-info["CFBundleVersion"]="11"
+info["CFBundleVersion"]="12"
 info["CFBundleName"]="Bloodborne"
 info["CFBundleDisplayName"]="Bloodborne"
 info["CFBundleIcons"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60"],"UIPrerenderedIcon":False}}
