@@ -1,11 +1,12 @@
 # Bloodborne iOS experimental runtime
 
-## Build 16 changes (device verification pending)
+## Build 16 — compiled successfully; device verification pending
 
 - Default Korean now corrects the game's regional mapping for Korean index 19 after a complete resolver layout hash check. It preserves the other 20 mappings and covers inlined resolver copies without modifying the personal AOT library.
 - Discover nonempty message archives under case-insensitive `kor*` directories. Alias only game locale `korkr` to the detected directory (including `korko`); English/French/other selected locale paths are unchanged. Actual message opens remain logged.
 - Spread noncritical texture collection across submissions (8 ms minimum interval, 2 ms candidate-scan budget). Individual frees may exceed that budget. Critical memory collection keeps the existing emergency passes; budgets and protected GPU-only image contents are unchanged.
 - Log collector time and Metal pipeline creation time separately as `iOS streaming GC` and `iOS streaming PSO`. This does not eliminate first-use pipeline compilation; Metal binary archives stay disabled because of prior memory failures.
+- macOS Actions build [41657669932](https://github.com/ajellia81-cmd/bloodborne-ios-public/actions/runs/41657669932) passed for code commit `c129a5cbd5f2ddbe421787bc99a8f454ec29952b`. Native unsigned IPA packaging, ARM64/iOS platform checks, Mach-O segment sizes, preserved guard segment, required locale/streaming symbols and ZIP integrity were verified. The personal AOT library was combined privately and was not uploaded to this repository or Actions.
 - Host fixtures passed: directory casing/alias, empty resource detection, preservation of every other mapping, and invalid-layout fallback. A private test against the supplied executable also passed its resolver hash guard and data-only replacement; no game bytes are included here or uploaded to CI. Korean display, frame pacing, and memory behavior still require device validation.
 
 
