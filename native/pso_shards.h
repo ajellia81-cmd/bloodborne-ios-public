@@ -3,6 +3,7 @@
 #include <TargetConditionals.h>
 #if TARGET_OS_IPHONE
 #include <os/proc.h>
+extern "C" int bb_ios_is_background(void);
 #endif
 #include <atomic>
 #include <deque>
@@ -37,7 +38,7 @@ class Shards {
     std::atomic<unsigned long long> hits{0},misses{0},writes{0},dropped{0},rejected{0};
     static bool Headroom(){
 #if TARGET_OS_IPHONE
-        return os_proc_available_memory()>=MinHeadroom;
+        return !bb_ios_is_background()&&os_proc_available_memory()>=MinHeadroom;
 #else
         return false;
 #endif
