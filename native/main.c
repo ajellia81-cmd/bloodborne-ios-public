@@ -74,6 +74,15 @@ int main(int argc,char **argv) {
     char cjk_font[4096];
     snprintf(cjk_font,sizeof(cjk_font),"%sFonts/NotoSansKR.ttf",base);
     setenv("BB_CJK_FONT",cjk_font,1);
+    char recomp_library[4096];
+    snprintf(recomp_library,sizeof(recomp_library),"%sFrameworks/librecomp.dylib",base);
+    const int aot_available=exists(recomp_library);
+    if(aot_available) {
+        setenv("BB_RECOMP_LIB",recomp_library,1);
+        printf("Personal AOT library found: %s\n",recomp_library);
+    } else {
+        puts("No personal AOT library: interpreter fallback");
+    }
     setenv("BB_PATCHES_XML",xml,1);
     setenv("BB_DATA_DIR",root,1);
     SDL_Window *window=NULL; SDL_Renderer *renderer=NULL;
@@ -117,7 +126,7 @@ int main(int argc,char **argv) {
         SDL_RenderDebugText(renderer,40,260,"Korean game language requested. Region/DLC compatibility unverified.");
         SDL_RenderDebugText(renderer,40,290,"This build has not been tested on a physical iPhone.");
         SDL_RenderDebugText(renderer,40,330,ready?"Files found. Tap screen or press controller A to try booting.":"Required files missing. Copy files into the app, then tap to recheck.");
-        SDL_RenderDebugText(renderer,40,370,"CPU interpreter only: game performance is expected to be limited.");
+        SDL_RenderDebugText(renderer,40,370,aot_available ? "Personal AOT library present; runtime validates functions at boot." : "CPU interpreter only: game performance is expected to be limited.");
         SDL_RenderDebugText(renderer,40,400,"Logs: Bloodborne/runtime.log");
         char display_text[128];
         snprintf(display_text,sizeof(display_text),"Native display: %d x %d pixels, aspect %.5f",pixel_width,pixel_height,pixel_height ? (double)pixel_width/pixel_height : 0.0);
