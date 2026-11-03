@@ -28,7 +28,8 @@ python3 - "$app/Info.plist" <<'PY'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,"rb") as f: info=plistlib.load(f)
-info["CFBundleVersion"]="13"
+info["CFBundleVersion"]="14"
+info["UIApplicationSupportsIndirectInputEvents"]=True
 info["CFBundleName"]="Bloodborne"
 info["CFBundleDisplayName"]="Bloodborne"
 info["CFBundleIcons"]={"CFBundlePrimaryIcon":{"CFBundleIconFiles":["AppIcon60x60"],"UIPrerenderedIcon":False}}
@@ -41,6 +42,8 @@ export PKG_CONFIG_SYSROOT_DIR=
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -I"$prefix/include" -c native/main.c -o output/native-main.o
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -I"$prefix/include" -c native/display.c -o output/native-display.o
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -c native/diagnostics.c -o output/native-diagnostics.o
+xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -c native/lifecycle.c -o output/native-lifecycle.o
+xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -fobjc-arc -c native/lifecycle.m -o output/native-lifecycle-objc.o
 python3 scripts/trace-initializers.py generate output/init-trace.c
 xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -O2 -c output/init-trace.c -o output/init-trace.o
 archives=("$prefix"/lib/*.a)
@@ -50,7 +53,7 @@ while IFS= read -r archive; do
 done < <(find "$runtime/out/ios/gpu" -type f -name '*.a')
 # Upstream libraries only: generated game code is never linked into a public artifact.
 xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 \
-  output/native-diagnostics.o output/init-trace.o output/native-main.o output/native-display.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
+  output/native-diagnostics.o output/init-trace.o output/native-lifecycle.o output/native-lifecycle-objc.o output/native-main.o output/native-display.o "$runtime/out/ios/libbbios.a" "$runtime/out/ios/gpu/libbbgpu.a" \
   "${gpuarchives[@]}" "${archives[@]}" $(pkg-config --libs --static sdl3 libavformat libavcodec libavutil libswscale libswresample) \
   -framework UIKit -framework Foundation -framework Metal -framework QuartzCore \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework VideoToolbox \
@@ -100,3 +103,4 @@ file "$app/BloodborneIOS" | tee output/native-binary.txt
 xcrun vtool -show-build "$app/BloodborneIOS" | tee output/native-platform.txt
 otool -L "$app/BloodborneIOS" | tee output/native-linkage.txt
 (cd output && zip -qr Bloodborne-iOS-experimental-unsigned.ipa Payload)
+

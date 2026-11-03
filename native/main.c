@@ -5,6 +5,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include "display.h"
+#include "lifecycle.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +39,8 @@ int main(int argc,char **argv) {
     setenv("BB_JIT","0",1);
     setenv("BB_IOS_PROGRESS","0",1);
     setenv("BB_METAL_FRAME","1",1);
+    setenv("BB_METAL_ARCHIVE","0",1);
+    puts("iOS memory: Metal binary archive disabled; native output retained");
     setenv("BB_FULLSCREEN","1",1);
     setenv("BB_RETINA","1",1);
     setenv("BB_METAL_NATIVE_BOOT","1",1);
@@ -47,6 +50,14 @@ int main(int argc,char **argv) {
     setenv("BB_AUTO_GRAPHICS_HEAP","0",1);
     puts("iOS memory budget: retail graphics heaps; native viewport retained");
     setenv("BB_LANGUAGE","9",1);
+    puts("Game text default: Korean requested (SCE language 9); regional executable/data may restrict it");
+    const char *ko_dirs[]={"dvdroot_ps4/msg/kor","dvdroot_ps4/msg/korean","dvdroot_ps4/msg/ko"};
+    int ko_candidate=0;
+    for(unsigned k=0;k<sizeof(ko_dirs)/sizeof(ko_dirs[0]);++k) {
+        char candidate[4096];snprintf(candidate,sizeof(candidate),"%s/%s",game,ko_dirs[k]);
+        if(exists(candidate)) {ko_candidate=1;printf("Korean resource directory found: %s (game compatibility still required)\n",ko_dirs[k]);}
+    }
+    if(!ko_candidate) puts("Korean resource directory not found: a language default cannot supply missing translations");
     setenv("BB_UI_LANGUAGE","ko",1);
     setenv("BB_UI_SCALE","1.75",1);
     setenv("BB_ONLINE","0",1);
@@ -61,6 +72,7 @@ int main(int argc,char **argv) {
     }
     bb_diagnostic_mark("SDL_Init succeeded");
     puts("startup: SDL initialized");
+    bb_ios_lifecycle_install();
     int gamepad_count=0;
     SDL_JoystickID *gamepad_ids=SDL_GetGamepads(&gamepad_count);
     for(int i=0;gamepad_ids && i<gamepad_count;i++) {
@@ -123,7 +135,7 @@ int main(int argc,char **argv) {
         SDL_RenderDebugText(renderer,40,195,"  boot-linked.bin  Prepared from your game and system modules");
         SDL_RenderDebugText(renderer,40,220,"  Resolution patches are built on-device for the native display.");
         SDL_RenderDebugText(renderer,40,240,"  content.bin      AppContent profile from your game");
-        SDL_RenderDebugText(renderer,40,260,"Korean game language requested. Region/DLC compatibility unverified.");
+        SDL_RenderDebugText(renderer,40,260,"Korean requested (SCE 9); available text depends on your regional game data.");
         SDL_RenderDebugText(renderer,40,290,"This build has not been tested on a physical iPhone.");
         SDL_RenderDebugText(renderer,40,330,ready?"Files found. Tap screen or press controller A to try booting.":"Required files missing. Copy files into the app, then tap to recheck.");
         SDL_RenderDebugText(renderer,40,370,aot_available ? "Personal AOT library present; runtime validates functions at boot." : "CPU interpreter only: game performance is expected to be limited.");
@@ -145,3 +157,4 @@ int main(int argc,char **argv) {
     bb_diagnostic_mark("game runtime returned");
     return result;
 }
+

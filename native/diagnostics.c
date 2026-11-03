@@ -33,7 +33,7 @@ __attribute__((constructor(101))) void bb_diagnostic_init(void) {
     snprintf(path,sizeof(path),"%s/Documents/Bloodborne",home); mkdir(path,0700);
     snprintf(path,sizeof(path),"%s/Documents/Bloodborne/startup.log",home);
     diagnostic_fd=open(path,O_WRONLY|O_CREAT|O_APPEND,0600);
-    bb_diagnostic_mark("\n=== Bloodborne build 13 startup: early loader initializer entered ===");
+    bb_diagnostic_mark("\n=== Bloodborne build 14 startup: early loader initializer entered ===");
     struct sigaction action; memset(&action,0,sizeof(action));
     sigemptyset(&action.sa_mask); action.sa_sigaction=caught; action.sa_flags=SA_SIGINFO;
     const int signals[]={SIGABRT,SIGSEGV,SIGBUS,SIGILL,SIGFPE};
@@ -49,3 +49,4 @@ __attribute__((constructor(101))) void bb_diagnostic_init(void) {
     setenv("BB_USER_DIR",path,1);
     bb_diagnostic_mark("GPU user directory prepared before static initializers");
 }
+

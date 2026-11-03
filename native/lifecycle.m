@@ -1,0 +1,90 @@
+#import <UIKit/UIKit.h>
+#import <Metal/Metal.h>
+#include "lifecycle.h"
+#include <stdio.h>
+#import <os/proc.h>
+#import <mach/mach.h>
+
+extern void runtime_audio_set_paused(int paused);
+static NSMutableSet<id<MTLCommandQueue>> *queues;
+static int inactive;
+static void memory_report(const char *stage) {
+    task_vm_info_data_t info={0};mach_msg_type_number_t count=TASK_VM_INFO_COUNT;
+    if(task_info(mach_task_self(),TASK_VM_INFO,(task_info_t)&info,&count)==KERN_SUCCESS)
+        printf("iOS memory (%s): footprint=%llu MiB, remaining allocation allowance=%llu MiB\n",stage,
+            (unsigned long long)(info.phys_footprint>>20),
+            (unsigned long long)(os_proc_available_memory()>>20));
+}
+
+/* Called with the GPU lease held. All runtime Metal command buffers use this bridge. */
+void bb_ios_metal_commit_locked(void *buffer) {
+    id<MTLCommandBuffer> command = (__bridge id<MTLCommandBuffer>)buffer;
+    if (!command) { fprintf(stderr,"iOS Metal: nil command buffer (allocation failed)\n"); return; }
+    if (!queues) queues = [NSMutableSet new];
+    [queues addObject:command.commandQueue];
+    [command addCompletedHandler:^(id<MTLCommandBuffer> completed) {
+        if (completed.status == MTLCommandBufferStatusError) {
+            fprintf(stderr,"iOS Metal command failed: %s\n",completed.error.description.UTF8String);
+        }
+    }];
+    [command commit];
+}
+void bb_ios_metal_commit(void *buffer) {
+    bb_ios_gpu_begin();
+    bb_ios_metal_commit_locked(buffer);
+    bb_ios_gpu_end();
+}
+static void pause_game(void) {
+    if (inactive) return;
+    inactive=1;
+    memory_report("inactive");
+    bb_ios_set_background(1);
+    runtime_audio_set_paused(1);
+    bb_ios_gpu_quiesce_begin();
+    /* Bound the UIKit callback even if an earlier GPU fault has already stalled a queue. */
+    for (id<MTLCommandQueue> queue in queues) {
+        dispatch_semaphore_t done=dispatch_semaphore_create(0);
+        id<MTLCommandBuffer> fence=[queue commandBuffer];
+        fence.label=@"Bloodborne background drain";
+        [fence addCompletedHandler:^(id<MTLCommandBuffer> completed) { dispatch_semaphore_signal(done); }];
+        [fence commit];
+        if (dispatch_semaphore_wait(done,dispatch_time(DISPATCH_TIME_NOW,500*NSEC_PER_MSEC)))
+            fprintf(stderr,"iOS lifecycle: GPU drain exceeded 500 ms; earlier GPU work still pending\n");
+    }
+    bb_ios_gpu_end();
+    puts("iOS lifecycle: inactive; guest execution, audio and Metal submissions paused");
+}
+static void resume_game(void) {
+    if (!inactive) return;
+    runtime_audio_set_paused(0);
+    inactive=0;
+    memory_report("active");
+    bb_ios_set_background(0);
+    puts("iOS lifecycle: active; audio reset and guest/Metal gates resumed");
+}
+static void pump_foreground(void) {
+    if (![NSThread isMainThread]) return;
+    while (bb_ios_is_background()) {
+        @autoreleasepool {
+            [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode
+                beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
+        }
+    }
+}
+void bb_ios_lifecycle_install(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once,^{
+        bb_ios_main_pump=pump_foreground;
+        memory_report("startup");
+        NSNotificationCenter *center=[NSNotificationCenter defaultCenter];
+        [center addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:nil
+                       usingBlock:^(NSNotification *note) { pause_game(); }];
+        [center addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:nil
+                       usingBlock:^(NSNotification *note) { pause_game(); }];
+        [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil
+                       usingBlock:^(NSNotification *note) { resume_game(); }];
+        [center addObserverForName:UIApplicationDidReceiveMemoryWarningNotification object:nil queue:nil
+                       usingBlock:^(NSNotification *note) { memory_report("UIKit memory warning"); }];
+        if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) pause_game();
+    });
+}
