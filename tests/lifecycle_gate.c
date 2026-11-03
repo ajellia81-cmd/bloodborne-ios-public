@@ -3,13 +3,22 @@
 #include <stdatomic.h>
 #include <assert.h>
 #include <time.h>
-static atomic_int ran;
+static atomic_int ran,drained;
 static void delay(void) { struct timespec t={0,20000000}; nanosleep(&t,0); }
 static void *guest(void *unused) { (void)unused; bb_ios_wait_foreground(); atomic_fetch_add(&ran,1); return 0; }
 static void *gpu(void *unused) { (void)unused; bb_ios_gpu_begin(); atomic_fetch_add(&ran,1); bb_ios_gpu_end(); return 0; }
+static void *quiesce(void *unused) {
+    (void)unused;bb_ios_set_background(1);bb_ios_gpu_quiesce_begin();
+    atomic_store(&drained,1);bb_ios_gpu_end();return 0;
+}
 int main(void) {
     pthread_t a,b;
     bb_ios_gpu_begin();bb_ios_gpu_begin();bb_ios_gpu_end();bb_ios_gpu_end();
+    /* In-flight submission must leave its lease before the background drain can begin. */
+    bb_ios_gpu_begin();assert(!pthread_create(&a,0,quiesce,0));
+    while(!bb_ios_is_background()) delay();
+    delay();assert(!atomic_load(&drained));bb_ios_gpu_end();pthread_join(a,0);
+    assert(atomic_load(&drained));bb_ios_set_background(0);
     for(int i=0;i<10;++i) {
         bb_ios_set_background(1);atomic_store(&ran,0);
         assert(!pthread_create(&a,0,guest,0));assert(!pthread_create(&b,0,gpu,0));

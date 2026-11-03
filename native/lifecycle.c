@@ -18,7 +18,9 @@ void bb_ios_set_background(int value) {
     }
 }
 void bb_ios_wait_foreground(void) {
-    if (gpu_depth || !bb_ios_is_background()) return;
+    /* Foreground hot path must not resolve thread-local storage on every AOT host call. */
+    if (!bb_ios_is_background()) return;
+    if (gpu_depth) return;
     if (bb_ios_main_pump) bb_ios_main_pump();
     pthread_mutex_lock(&gate);
     while (bb_ios_is_background()) pthread_cond_wait(&foreground,&gate);

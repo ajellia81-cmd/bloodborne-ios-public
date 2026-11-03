@@ -13,7 +13,7 @@ A game-free iOS shell for Bloodborne-native, built entirely with cloud tooling a
 | Native-display profile behavior | Passed: portrait normalization, landscape pixels, aspect auto and preservation of unrelated settings |
 | Updated native-display IPA | Passed: run 41284868696; unsigned iOS ARM64, bundled patch XML, system framework/library imports only |
 | Physical-device launcher and early game initialization | User logs: build 7 reaches SDL, native Metal, game worker threads and audio initialization |
-| Game rendering and gameplay | Unresolved: GXRenderThread faults reading address 0x10 in the CPU interpreter |
+| Game rendering and gameplay | Former heap fault passed; character creation reached; owner reports exit during world loading (build 13) |
 | Korean rendering, DLC, frame rate | Not verified |
 
 The earlier compiler failure in macos-on-ios used the runner's default Xcode 16.4 / SDK 18.5, which lacks Metal 4 declarations. The workflow explicitly selects Xcode 26.3. The upstream iOS core script also needs modern Bash to handle its empty GPU-stub array under nounset; the workflow uses Homebrew Bash.
@@ -89,3 +89,14 @@ The launcher now detects `Frameworks/librecomp.dylib` inside a personal app and 
 
 
 Build 13 public Actions run `41577577514` completed successfully. A separate personal variant was compiled privately from the owner's previously supplied executable: 241,821 functions, 384 objects, LLVM 18.1.8, `-O2`, ARM64 iOS 26.0 and recompiler API 4. The personal library and personalized IPA are not published in this repository or Actions. Its platform, segment sizes, unsigned state, exported initialization symbol and IPA ZIP integrity were checked. The base Xcode-linked app already imports the same three 128-bit arithmetic helpers from libSystem, confirming the SDK-less library's required system imports. This is structural/build validation, not a physical-device loading-time or FPS measurement. Native output dimensions/aspect are unchanged. The public IPA still uses interpreter fallback unless a personal library is bundled.
+
+
+
+## Build 14: lifecycle and world-loading stability
+The owner's build 13 log confirms 241,004 of 241,031 library functions activated. It includes a GPU-watchdog stall in one session and, in the last session, texture-memory pressure and a 10-second Metal archive write before logging stops. The last session does not include a fatal signal or a jetsam report: the termination cause is not established.
+
+Build 14 closes a cooperative guest-execution gate on UIKit inactivity, pauses/clears SDL audio streams and resets their pacing on return. Foreground leases serialize Metal submissions and cover drawable acquisition through presentation; existing queues are drained with a bounded wait before background. The UI thread can continue pumping foreground notifications if startup encounters the gate. Foreground guest checks avoid thread-local lookup. The renderer's binary archive is disabled, following the upstream iOS memory guidance, without changing scene/output dimensions. Metal completion errors, memory allowance and lifecycle transitions are logged. Controller Guide and the existing Korean UI font remain.
+
+Cloud checks: repeated guest/GPU pause/resume, nested submission leases and in-flight drain ordering pass; the UIKit/Metal Objective-C bridge compiled against the actual iPhoneOS SDK (run 41616770350). Full IPA validation is recorded after the main build. Device background/resume and character-to-world entry still require testing; these changes are not a claim that the reported exit has been reproduced or cured in cloud.
+
+Korean remains the requested system default (`BB_LANGUAGE=9`). Expected Korean message directories are checked at launch and the result is logged. The European game's own language menu and missing translation assets cannot be supplied by changing the system request or adding the launcher's CJK font. Actual Korean game text remains unverified. Game assets and the personalized AOT library stay outside the public repository and Actions.
