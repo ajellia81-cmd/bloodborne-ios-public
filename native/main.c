@@ -6,6 +6,7 @@
 #include <SDL3/SDL_main.h>
 #include "display.h"
 #include "lifecycle.h"
+#include "locale.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,7 +33,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 14; lifecycle guard, Metal archive off, Korean language requested.");
+    puts("Bloodborne iOS build 15; lifecycle guard, Metal archive off, Korean language requested.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
@@ -48,22 +49,15 @@ int main(int argc,char **argv) {
     setenv("BB_POOL_SPLIT","0",1);
     setenv("BB_DMEM_MB","4608",1);
     setenv("BB_AUTO_GRAPHICS_HEAP","0",1);
-    puts("iOS memory budget: retail graphics heaps; native viewport retained");
-    setenv("BB_LANGUAGE","9",1);
-    puts("Game text default: Korean requested (SCE language 9); regional executable/data may restrict it");
-    const char *ko_dirs[]={"dvdroot_ps4/msg/kor","dvdroot_ps4/msg/korean","dvdroot_ps4/msg/ko"};
-    int ko_candidate=0;
-    for(unsigned k=0;k<sizeof(ko_dirs)/sizeof(ko_dirs[0]);++k) {
-        char candidate[4096];snprintf(candidate,sizeof(candidate),"%s/%s",game,ko_dirs[k]);
-        if(exists(candidate)) {ko_candidate=1;printf("Korean resource directory found: %s (game compatibility still required)\n",ko_dirs[k]);}
-    }
-    if(!ko_candidate) puts("Korean resource directory not found: a language default cannot supply missing translations");
+    puts("iOS memory budget: retail graphics heaps; native output with memory-safe internal scene");
+    bb_ios_locale_prepare(game);
     setenv("BB_UI_LANGUAGE","ko",1);
     setenv("BB_UI_SCALE","1.75",1);
     setenv("BB_ONLINE","0",1);
     setenv("BB_FPS","30",1);
     setenv("BB_FPS_LIMIT","30",1);
-    setenv("BB_UPSCALER","off",1);
+    setenv("BB_UPSCALER","metalfx",1);
+    setenv("BB_UPSCALE_PRESET","3",1);
     SDL_SetHint(SDL_HINT_ORIENTATIONS,"LandscapeLeft LandscapeRight");
     bb_diagnostic_mark("entering SDL_Init");
     puts("startup: entering SDL_Init");
@@ -157,4 +151,5 @@ int main(int argc,char **argv) {
     bb_diagnostic_mark("game runtime returned");
     return result;
 }
+
 

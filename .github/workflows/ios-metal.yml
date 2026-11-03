@@ -12,6 +12,8 @@ on:
       - 'scripts/patch-ios-touch-menu.py'
       - 'scripts/patch-ios-lifecycle.py'
       - 'tests/lifecycle_gate.c'
+      - 'scripts/patch-ios-locale.py'
+      - 'tests/locale_selection.c'
       - 'native/**'
 permissions:
   contents: read
@@ -42,6 +44,8 @@ jobs:
           python3 scripts/patch-ios-lifecycle.py
           clang -std=c11 -Wall -Wextra -Werror -pthread -Inative native/lifecycle.c tests/lifecycle_gate.c -o output/lifecycle-test
           output/lifecycle-test
+          clang -std=c11 -Wall -Wextra -Werror -Inative native/locale.c tests/locale_selection.c -o output/locale-test
+          output/locale-test
       - name: Install host shader tools
         run: brew install glslang pkgconf nasm bash
       - uses: actions/cache/restore@v4
@@ -89,6 +93,7 @@ jobs:
           set -euo pipefail
           python3 scripts/patch-ios-memory-budget.py
           python3 scripts/patch-interpreter-diagnostics.py
+          python3 scripts/patch-ios-locale.py
           "$(brew --prefix)/bin/bash" upstream-runtime/scripts/ios/build-core.sh 2>&1 | tee output/core-build.log
           cp upstream-runtime/out/ios/libbbios.a output/
           cp upstream-runtime/out/ios/gpu/libbbgpu.a output/
@@ -111,4 +116,5 @@ jobs:
             output/*.txt
             output/*.log
           retention-days: 14
+
 

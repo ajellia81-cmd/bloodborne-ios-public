@@ -19,7 +19,7 @@ A game-free iOS shell for Bloodborne-native, built entirely with cloud tooling a
 The earlier compiler failure in macos-on-ios used the runner's default Xcode 16.4 / SDK 18.5, which lacks Metal 4 declarations. The workflow explicitly selects Xcode 26.3. The upstream iOS core script also needs modern Bash to handle its empty GPU-stub array under nounset; the workflow uses Homebrew Bash.
 
 ## Native display and aspect ratio
-The shell queries the fullscreen high-density drawable in **pixels**, normalizes it to landscape, and uses it for both output and scene rendering. It writes `aspect_ratio=auto`, `live_resolution=0` and the measured `output_res`, while preserving other settings.
+The shell queries the fullscreen high-density drawable in **pixels**, normalizes it to landscape, for native output. Build 15 uses a half-width/half-height internal scene with MetalFX Performance to address confirmed GPU out-of-memory errors. It writes `aspect_ratio=auto`, `live_resolution=0` and the measured `output_res`, while preserving other settings.
 
 There is no forced 16:9 or 960x540 output. For example, a 2868x1320 drawable uses 2868x1320 at 239:110. The launcher canvas scales uniformly. Status bars are hidden and the game window requests fullscreen Retina rendering. The patch XML is bundled, and the current upstream C patch builder generates resolution patches at launch using `--patches -`; no prebuilt `patches.bin` is needed.
 
@@ -102,3 +102,14 @@ Cloud checks: repeated guest/GPU pause/resume, nested submission leases and in-f
 Korean remains the requested system default (`BB_LANGUAGE=9`). Expected Korean message directories are checked at launch and the result is logged. The European game's own language menu and missing translation assets cannot be supplied by changing the system request or adding the launcher's CJK font. Actual Korean game text remains unverified. Game assets and the personalized AOT library stay outside the public repository and Actions.
 
 Build 14 final CI run `41618475369` (code revision `aeb263fe40487070ca4fa8a0bf071ba7d020cd03`) passed. The private package passed ARM64/iOS 26 platform checks, PAGEZERO preservation, segment bounds, absence of signature/chained-fixup commands, lifecycle symbol checks and ZIP integrity. Its API-4 AOT library is byte-identical to the previously activated personal library. Device background/resume, world-entry stability and actual Korean game text remain unverified for build 14.
+
+
+
+## Build 15: confirmed GPU memory failure and korko selection
+The build 14 device log reaches the first cutscene, then records a UIKit memory warning, repeated Metal command-buffer Code 8 (`kIOGPUCommandBufferCallbackErrorOutOfMemory`), and driver-reported usage above the critical texture-GC mark. This establishes GPU allocation failures before the reported exit; the exact process-termination mechanism is not captured.
+
+Output remains native 2868x1320 and fullscreen, with the same aspect ratio. To reduce resolution-dependent render-target memory, the default scene is now 1434x660, enlarged by MetalFX Performance. This deliberately trades internal rendering resolution for headroom; it is not native-resolution scene rendering. Other devices use the equivalent even-sized half-resolution profile, or unscaled rendering on small displays. The binary archive remains off. Physical-device stability and resulting image quality still need verification.
+
+The owner identified the real Korean folder as `game/dvdroot_ps4/msg/korko`. The previous startup checker incorrectly tried `kor`, `korean` and `ko` and therefore missed it. Its miss was not evidence that Korean assets were absent. Build 15 checks readable nonempty message archives in `korko` and enables a read-only Korean preference when those candidates exist. The shared guest path resolver uses the corresponding existing Korean message file instead of another five-letter locale's file, including file checks and actual opens. Localized font paths are similarly redirected only if the Korean counterpart exists. Missing counterparts retain the original selection; savedata and other mounts are excluded. No original files are renamed, overwritten or committed. Successful Korean file opens are logged separately from directory detection. Actual Korean glyph rendering/completeness remains a device test.
+
+Cloud fixture tests cover archive detection, file selection/fallback, save isolation and buffer bounds. Display-profile tests cover native output, half-size internal rendering, MetalFX settings, portrait normalization and small-screen fallback. No game assets are used by these tests or the public build.
