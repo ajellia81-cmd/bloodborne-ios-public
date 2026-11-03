@@ -1,6 +1,6 @@
 # Bloodborne iOS experimental runtime
 
-## Build 17 — pipeline cache candidate, device verification pending
+## Build 17 — compiled successfully; device verification pending
 
 - Build 16 device feedback confirmed Korean Default works. The latest device log measured individual Metal pipeline creations up to 262.22 ms, versus texture collection calls up to 1.82 ms. First-use pipeline creation is a confirmed source of long blocking work; texture uploads and other stages may also contribute.
 - Cache individual Metal pipeline descriptors in device-local binary archive shards. Read one shard at a time and release the archive reference after the lookup; the monolithic archive stays disabled. Oversized or invalid shards fall back to normal creation. GPU/OS cache namespaces, a loading marker and failed-entry removal limit reuse of invalid data.
@@ -8,6 +8,7 @@
 - Write descriptor snapshots on a utility worker after a two-second quiet interval, with no foreground pipeline creation in progress at the time the writer takes a job. A new foreground creation can begin while a write is already in progress.
 - Coalesce concurrent creation of the same render, compute, tessellation or geometry map key. Recheck the original exact-key map after waiting; unrelated keys proceed independently. Do not skip draws or substitute a mismatched pipeline.
 - Newly encountered pipelines can still compile synchronously. Improvements are expected primarily for cached pipelines across launches and duplicate concurrent requests. No claim of eliminating all first-visit stutter or of verified device memory behavior.
+- Validation passed for code commit `199dd14f8dd1c3700b5cdaee92cf72a3259bf1b9`: [macOS full build](https://github.com/ajellia81-cmd/bloodborne-ios-public/actions/runs/41724719574), [real iOS SDK template check](https://github.com/ajellia81-cmd/bloodborne-ios-public/actions/runs/41724719619), concurrency/limit fixtures, locale and display tests, LiveContainer Mach-O layout and native unsigned IPA packaging. Private packaging verified ARM64/iOS platform, segment bounds, required native symbols, unchanged personal AOT hash and ZIP integrity. Device cache hits, memory behavior and frame pacing remain unverified.
 - Device-created shader caches and personal AOT code are not included in this public repository or Actions artifacts. Korean selection, output resolution, input and lifecycle fixes continue from build 16.
 
 
