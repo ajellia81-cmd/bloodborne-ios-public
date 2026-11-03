@@ -1,0 +1,33 @@
+name: iOS PSO SDK check
+on:
+  push:
+    paths:
+      - '.github/workflows/pso-sdk-check.yml'
+      - 'native/pso_shards.h'
+      - 'native/pso_cache_policy.h'
+      - 'tests/pso_metal_syntax.mm'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-pso-sdk-check
+  cancel-in-progress: true
+jobs:
+  syntax:
+    runs-on: macos-15-intel
+    timeout-minutes: 10
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Metal templates against actual iOS SDK
+        run: |
+          mkdir -p output/pso-syntax
+          cp native/pso_cache_policy.h output/pso-syntax/bb_ios_pso_cache_policy.h
+          # Declaration only: this check parses templates; the production GPU build links xxHash.
+          cat > output/pso-syntax/xxhash.h <<'HEADER'
+          #pragma once
+          #include <stddef.h>
+          extern "C" unsigned long long XXH3_64bits(const void*, size_t);
+          HEADER
+          xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 -std=c++20 -fobjc-arc -fsyntax-only -Wall -Wextra -Werror -Inative -Ioutput/pso-syntax tests/pso_metal_syntax.mm
