@@ -83,7 +83,6 @@ jobs:
           set -euo pipefail
           python3 scripts/patch-ios-memory-budget.py
           python3 scripts/patch-interpreter-diagnostics.py
-          python3 scripts/patch-ios-progress.py
           "$(brew --prefix)/bin/bash" upstream-runtime/scripts/ios/build-core.sh 2>&1 | tee output/core-build.log
           cp upstream-runtime/out/ios/libbbios.a output/
           cp upstream-runtime/out/ios/gpu/libbbgpu.a output/
