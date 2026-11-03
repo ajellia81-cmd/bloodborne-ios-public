@@ -1,5 +1,14 @@
 # Bloodborne iOS experimental runtime
 
+## Build 16 changes (device verification pending)
+
+- Default Korean now corrects the game's regional mapping for Korean index 19 after a complete resolver layout hash check. It preserves the other 20 mappings and covers inlined resolver copies without modifying the personal AOT library.
+- Discover nonempty message archives under case-insensitive `kor*` directories. Alias only game locale `korkr` to the detected directory (including `korko`); English/French/other selected locale paths are unchanged. Actual message opens remain logged.
+- Spread noncritical texture collection across submissions (8 ms minimum interval, 2 ms candidate-scan budget). Individual frees may exceed that budget. Critical memory collection keeps the existing emergency passes; budgets and protected GPU-only image contents are unchanged.
+- Log collector time and Metal pipeline creation time separately as `iOS streaming GC` and `iOS streaming PSO`. This does not eliminate first-use pipeline compilation; Metal binary archives stay disabled because of prior memory failures.
+- Host fixtures passed: directory casing/alias, empty resource detection, preservation of every other mapping, and invalid-layout fallback. A private test against the supplied executable also passed its resolver hash guard and data-only replacement; no game bytes are included here or uploaded to CI. Korean display, frame pacing, and memory behavior still require device validation.
+
+
 A game-free iOS shell for Bloodborne-native, built entirely with cloud tooling and GitHub Actions macOS runners. Target: iPhone 18 Pro Max. **The launcher and early game initialization have run on the user's device. Gameplay has not been verified.**
 
 ## Verified results
@@ -117,3 +126,4 @@ Per the owner's requested semantics, only the game's Default/system language is 
 Cloud fixture tests distinguish an empty locale folder from readable message archives and verify that no global locale override is enabled. Display tests cover native output, a half-size internal scene, MetalFX configuration, portrait normalization and small-display fallback.
 
 Build 15 final CI run `41627006284`, code revision `a706050882cc263518e7513149a23031c87db6c8`, passed. The strict macOS fixture's mkdtemp declaration was fixed with the Darwin feature macro. The downloaded display test confirms 2868x1320 output with a 1434x660 MetalFX scene. The private unsigned package passed ARM64/iOS platform checks, segment bounds, PAGEZERO/signature/fixup checks, preserved AOT identity and ZIP integrity. The locale diagnostic symbols are present and the removed global-remap symbol is absent. Cutscene/world-entry stability and actual Default-language Korean rendering are still awaiting device verification.
+
