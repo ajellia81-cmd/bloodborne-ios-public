@@ -9,6 +9,7 @@ on:
       - 'scripts/patch-interpreter-diagnostics.py'
       - 'scripts/patch-ios-memory-budget.py'
       - 'scripts/patch-ios-progress.py'
+      - 'scripts/patch-ios-touch-menu.py'
       - 'native/**'
 permissions:
   contents: read
@@ -33,6 +34,8 @@ jobs:
           git -C upstream-runtime checkout --detach FETCH_HEAD
           git -C upstream-runtime submodule update --init --depth 1 recomp third_party/LibAtrac9 gpu/third_party/imgui
           git -C upstream-runtime rev-parse HEAD | tee output/runtime-sha.txt
+      - name: Apply iOS touch and menu fixes
+        run: python3 scripts/patch-ios-touch-menu.py
       - name: Install host shader tools
         run: brew install glslang pkgconf nasm bash
       - uses: actions/cache/restore@v4
@@ -64,7 +67,7 @@ jobs:
         id: ios-gpu-cache
         with:
           path: upstream-runtime/out/ios/gpu
-          key: ios-gpu-xcode26.3-${{ hashFiles('output/runtime-sha.txt', 'upstream-runtime/deps/packages.cmake') }}
+          key: ios-gpu-xcode26.3-${{ hashFiles('output/runtime-sha.txt', 'upstream-runtime/deps/packages.cmake', 'scripts/patch-ios-touch-menu.py') }}
       - name: Build actual iOS Metal GPU library
         if: steps.ios-gpu-cache.outputs.cache-hit != 'true'
         run: |
