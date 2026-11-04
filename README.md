@@ -153,3 +153,9 @@ Build 15 final CI run `41627006284`, code revision `a706050882cc263518e7513149a2
 
 
 
+
+
+## Build 18 validation (2026-11-04)
+Full iOS Metal runtime run [41747245155](https://github.com/ajellia81-cmd/bloodborne-ios-public/actions/runs/41747245155) and iOS SDK check [41747245118](https://github.com/ajellia81-cmd/bloodborne-ios-public/actions/runs/41747245118) passed at code revision `6f9b5514d470e356965233f38bf71ba90fc8565e`. Both original and transformed tessellation fixture modules pass `spirv-val --target-env vulkan1.1`. Haptic phase/deduplication/retry, PSO concurrency and write-cost policy, locale selection and display profile tests passed. Native output remains 2868x1320; the internal MetalFX scene remains half size.
+
+Build18 changes are candidates for device validation: full tessellation patch-member layout, cost-filtered and paced PSO persistence, and pre-game haptic preparation. Existing personal API-4 AOT is unchanged and remains outside CI/repository. The shader/cache version changes require a first-use rebuild. Hunter's Dream camera corruption, first-rumble hitch, residual stuttering and sustained slowdown have NOT been verified fixed on a physical device. Five-second game-frame/thermal/memory diagnostics were added to distinguish these remaining causes. Korean was confirmed by the owner in build16 and remains Default-only; other language selections are preserved.
