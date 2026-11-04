@@ -5,6 +5,7 @@ on:
       - '.github/workflows/pso-sdk-check.yml'
       - 'native/pso_shards.h'
       - 'native/pso_cache_policy.h'
+      - 'native/lifecycle.m'
       - 'tests/pso_metal_syntax.mm'
   workflow_dispatch:
 permissions:
@@ -31,3 +32,7 @@ jobs:
           extern "C" unsigned long long XXH3_64bits(const void*, size_t);
           HEADER
           xcrun --sdk iphoneos clang++ -target arm64-apple-ios26.0 -std=c++20 -fobjc-arc -fsyntax-only -Wall -Wextra -Werror -Inative -Ioutput/pso-syntax tests/pso_metal_syntax.mm
+
+      - name: Check native frame and thermal observer against actual iOS SDK
+        run: |
+          xcrun --sdk iphoneos clang -target arm64-apple-ios26.0 -fobjc-arc -fsyntax-only -Wall -Wextra -Werror -Wno-unused-parameter -Inative native/lifecycle.m

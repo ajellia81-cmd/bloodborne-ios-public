@@ -2,6 +2,8 @@
 #import <Metal/Metal.h>
 #include "lifecycle.h"
 #include <stdio.h>
+#include <time.h>
+#include <pthread.h>
 #import <os/proc.h>
 #import <mach/mach.h>
 
@@ -34,9 +36,36 @@ void bb_ios_metal_commit(void *buffer) {
     bb_ios_metal_commit_locked(buffer);
     bb_ios_gpu_end();
 }
+static pthread_mutex_t frame_stats_lock=PTHREAD_MUTEX_INITIALIZER;
+static uint64_t last_frame_ns,window_ns,frame_max_ns,frame_intervals;
+static void reset_frame_stats(void){
+    pthread_mutex_lock(&frame_stats_lock);
+    last_frame_ns=window_ns=frame_max_ns=frame_intervals=0;
+    pthread_mutex_unlock(&frame_stats_lock);
+}
+void bb_ios_note_frame(void){
+    struct timespec ts;clock_gettime(CLOCK_MONOTONIC,&ts);
+    const uint64_t now=(uint64_t)ts.tv_sec*1000000000ull+(uint64_t)ts.tv_nsec;
+    pthread_mutex_lock(&frame_stats_lock);
+    if(!last_frame_ns){last_frame_ns=window_ns=now;pthread_mutex_unlock(&frame_stats_lock);return;}
+    const uint64_t interval=now-last_frame_ns;last_frame_ns=now;++frame_intervals;
+    if(interval>frame_max_ns)frame_max_ns=interval;
+    const uint64_t elapsed=now-window_ns;
+    if(elapsed>=5000000000ull){
+        static const char* names[]={"nominal","fair","serious","critical"};
+        const NSInteger thermal=NSProcessInfo.processInfo.thermalState;
+        printf("iOS game frames: %.2f FPS, average %.2f ms, maximum %.2f ms; thermal=%s lowPower=%d\n",
+            frame_intervals*1000000000.0/elapsed,elapsed/(frame_intervals*1000000.0),frame_max_ns/1000000.0,
+            thermal>=0&&thermal<4?names[thermal]:"unknown",(int)NSProcessInfo.processInfo.lowPowerModeEnabled);
+        memory_report("frame interval");window_ns=now;frame_max_ns=frame_intervals=0;
+    }
+    pthread_mutex_unlock(&frame_stats_lock);
+}
+
 static void pause_game(void) {
     if (inactive) return;
     inactive=1;
+    reset_frame_stats();
     memory_report("inactive");
     bb_ios_set_background(1);
     runtime_audio_set_paused(1);
@@ -58,6 +87,7 @@ static void resume_game(void) {
     if (!inactive) return;
     runtime_audio_set_paused(0);
     inactive=0;
+    reset_frame_stats();
     memory_report("active");
     bb_ios_set_background(0);
     puts("iOS lifecycle: active; audio reset and guest/Metal gates resumed");
@@ -88,3 +118,4 @@ void bb_ios_lifecycle_install(void) {
         if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) pause_game();
     });
 }
+

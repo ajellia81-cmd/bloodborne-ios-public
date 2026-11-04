@@ -1,5 +1,16 @@
 # Bloodborne iOS experimental runtime
 
+## Build 18 — fixes and diagnostics candidate; device verification pending
+
+- Latest build17 device log: PSO writes 245, hits 3, misses 455, skipped writes 196; individual creation reached 378.82 ms. This log contains one build17 startup and does not establish cross-launch cache effectiveness. The screenshot reports 28 FPS / 36 ms in Hunter's Dream, with stretched/occluding world geometry and intact HUD.
+- Persist only pipeline misses whose actual creation takes at least 8 ms. Pace the utility writer using measured write cost (19x cooldown, capped at 10 seconds), and scan the directory periodically or at budget boundaries instead of after every write. Cache entry/queue/file/headroom limits remain enforced. Archive writes are a possible contributor to sustained contention, not a confirmed sole cause of the reported slowdown.
+- Warm up SDL MFI haptic engines and both nonzero pattern players with a minimum-intensity 1 ms request followed by stop. Prepare once at launch and once when the game's pad opens after audio initialization. Log warmup and the first eight nonzero game requests. Behavior is grounded in SDL release-3.4.18; actual controller improvement needs testing.
+- Backport the live tessellation patch-constant layout correction from upstream `72148df82255df107fc88bdfec2e22928c324f9d`: control and evaluation stages declare complete patch members, and the Metal evaluation conversion touches declared patch inputs before SPIRV-Cross lays out the shared buffer. Add malformed-module guards. This addresses a concrete layout defect; the screenshot's cause is not yet confirmed on device.
+- Independent shader/MSL/PSO cache epochs invalidate pre-fix layouts automatically. First-use compilation can recur after this update. The personal AOT ABI and library stay unchanged.
+- Record lightweight five-second game frame intervals, memory headroom, thermal state and low-power mode. Full per-operation frame-stat timing stays off to limit measurement overhead. Pause/resume resets the observer window.
+- CI uses a previous completed GPU object cache when available and rebuilds changed dependencies; normalize only immutable source timestamps before patching. New patch/header hashes still select distinct completed caches. Validate synthetic SPIR-V before and after rewriting, policy concurrency, haptic lifecycle and native display/locale behavior.
+
+
 ## Build 17 — compiled successfully; device verification pending
 
 - Build 16 device feedback confirmed Korean Default works. The latest device log measured individual Metal pipeline creations up to 262.22 ms, versus texture collection calls up to 1.82 ms. First-use pipeline creation is a confirmed source of long blocking work; texture uploads and other stages may also contribute.
@@ -139,5 +150,6 @@ Per the owner's requested semantics, only the game's Default/system language is 
 Cloud fixture tests distinguish an empty locale folder from readable message archives and verify that no global locale override is enabled. Display tests cover native output, a half-size internal scene, MetalFX configuration, portrait normalization and small-display fallback.
 
 Build 15 final CI run `41627006284`, code revision `a706050882cc263518e7513149a23031c87db6c8`, passed. The strict macOS fixture's mkdtemp declaration was fixed with the Darwin feature macro. The downloaded display test confirms 2868x1320 output with a 1434x660 MetalFX scene. The private unsigned package passed ARM64/iOS platform checks, segment bounds, PAGEZERO/signature/fixup checks, preserved AOT identity and ZIP integrity. The locale diagnostic symbols are present and the removed global-remap symbol is absent. Cutscene/world-entry stability and actual Default-language Korean rendering are still awaiting device verification.
+
 
 

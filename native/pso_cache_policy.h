@@ -9,6 +9,8 @@ namespace BbIosPso {
 inline constexpr std::uintmax_t MaxEntry=1024*1024,MaxDisk=128*1024*1024;
 inline constexpr std::size_t MaxFiles=2048,MaxQueued=64,MinHeadroom=512*1024*1024;
 inline bool Eligible(std::uintmax_t n){return n>0&&n<=MaxEntry;}
+inline bool WorthPersisting(std::uint64_t us){return us>=8000;}
+inline std::uint64_t WriteCooldownUs(std::uint64_t us){return us>10000000/19?10000000:us*19;}
 inline bool CanQueue(std::size_t n){return n<MaxQueued;}
 class Flights {
     std::mutex mutex;
@@ -33,3 +35,4 @@ public:
     }
 };
 }
+

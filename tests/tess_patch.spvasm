@@ -1,0 +1,27 @@
+OpCapability Shader
+OpCapability Tessellation
+OpMemoryModel Logical GLSL450
+OpEntryPoint TessellationEvaluation %main "main" %a %b %position
+OpExecutionMode %main Triangles
+OpExecutionMode %main SpacingEqual
+OpExecutionMode %main VertexOrderCcw
+OpDecorate %a Patch
+OpDecorate %a Location 0
+OpDecorate %b Patch
+OpDecorate %b Location 1
+OpDecorate %position BuiltIn Position
+%void = OpTypeVoid
+%fn = OpTypeFunction %void
+%float = OpTypeFloat 32
+%v4 = OpTypeVector %float 4
+%input = OpTypePointer Input %v4
+%output = OpTypePointer Output %v4
+%a = OpVariable %input Input
+%b = OpVariable %input Input
+%position = OpVariable %output Output
+%main = OpFunction %void None %fn
+%entry = OpLabel
+%value = OpLoad %v4 %a
+OpStore %position %value
+OpReturn
+OpFunctionEnd

@@ -34,8 +34,9 @@ class Shards {
     unsigned building=0;
     std::thread writer;
     using Clock=std::chrono::steady_clock;
-    Clock::time_point last_creation=Clock::now(),last_report=Clock::now();
-    std::atomic<unsigned long long> hits{0},misses{0},writes{0},dropped{0},rejected{0};
+    Clock::time_point last_creation=Clock::now(),last_report=Clock::now(),next_write=Clock::now();
+    std::atomic<unsigned long long> hits{0},misses{0},writes{0},dropped{0},rejected{0},fast_skipped{0},write_us{0},max_write_us{0};
+    std::uintmax_t observed_bytes=0;std::size_t observed_files=0;
     static bool Headroom(){
 #if TARGET_OS_IPHONE
         return !bb_ios_is_background()&&os_proc_available_memory()>=MinHeadroom;
@@ -47,7 +48,7 @@ class Shards {
         std::scoped_lock lock{report_mutex};auto now=Clock::now();
         if(now-last_report<std::chrono::seconds(5))return;
         last_report=now;
-        std::printf("iOS PSO cache: hits=%llu misses=%llu writes=%llu dropped=%llu rejected=%llu (cumulative)\n",hits.load(),misses.load(),writes.load(),dropped.load(),rejected.load());
+        std::printf("iOS PSO cache: hits=%llu misses=%llu writes=%llu dropped=%llu rejected=%llu fast_skipped=%llu write_total=%.2f ms write_max=%.2f ms (cumulative)\n",hits.load(),misses.load(),writes.load(),dropped.load(),rejected.load(),fast_skipped.load(),write_us.load()/1000.0,max_write_us.load()/1000.0);
     }
     void Sweep(){
         struct Entry{std::filesystem::path path;std::uintmax_t size;std::filesystem::file_time_type time;};
@@ -63,6 +64,7 @@ class Shards {
             if(total<=MaxDisk&&count<=MaxFiles)break;
             if(std::filesystem::remove(e.path,ec)){total-=e.size;--count;}ec.clear();
         }
+        observed_bytes=total;observed_files=count;
     }
     void Loop(){
         pthread_setname_np("bb:iOSPsoCache");pthread_set_qos_class_self_np(QOS_CLASS_UTILITY,0);
@@ -71,13 +73,14 @@ class Shards {
             {
                 std::unique_lock lock{queue_mutex};cv.wait(lock,[&]{return stop||!queue.empty();});
                 // Cache writes start after a quiet interval to avoid competing with new PSOs.
-                while(!stop&&(building||Clock::now()<last_creation+std::chrono::seconds(2))){
-                    if(building)cv.wait(lock);else cv.wait_until(lock,last_creation+std::chrono::seconds(2));
+                while(!stop&&(building||Clock::now()<std::max(last_creation+std::chrono::seconds(2),next_write))){
+                    if(building)cv.wait(lock);else cv.wait_until(lock,std::max(last_creation+std::chrono::seconds(2),next_write));
                 }
                 if(stop)return;
                 job=std::move(queue.front());queue.pop_front();
             }
             if(!Headroom()){++dropped;continue;}
+            auto writing_started=Clock::now();
             @autoreleasepool{
                 NSError* error=nil;
                 id<MTLBinaryArchive> archive=[device newBinaryArchiveWithDescriptor:[MTLBinaryArchiveDescriptor new] error:&error];
@@ -90,11 +93,15 @@ class Shards {
                 if(ok)ok=[archive serializeToURL:[NSURL fileURLWithPath:[NSString stringWithUTF8String:temp.c_str()]] error:&error];
                 auto n=ok?std::filesystem::file_size(temp,ec):0;
                 if(ok&&!ec&&Eligible(n)){
-                    std::filesystem::rename(temp,job.path,ec);if(!ec)++writes;else ++dropped;
+                    std::filesystem::rename(temp,job.path,ec);if(!ec){++writes;observed_bytes+=n;++observed_files;}else ++dropped;
                 }else ++rejected;
                 std::filesystem::remove(temp,ec);
             }
-            Sweep();Report();
+            if(observed_bytes>MaxDisk||observed_files>MaxFiles||writes.load()%64==0)Sweep();
+            auto us=static_cast<unsigned long long>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-writing_started).count());
+            write_us.fetch_add(us);max_write_us.store(std::max(max_write_us.load(),us));
+            {std::scoped_lock lock{queue_mutex};next_write=Clock::now()+std::chrono::microseconds(WriteCooldownUs(us));}
+            Report();
         }
     }
     template<typename Descriptor>std::string Label(Descriptor* desc){
@@ -123,7 +130,7 @@ public:
         const char *env=std::getenv("BB_IOS_PSO_SHARDS"),*validation=std::getenv("MTL_SHADER_VALIDATION");
         if(!env||env[0]!='1'||(validation&&validation[0]=='1'))return;
         std::string identity=std::string(d.name.UTF8String)+NSProcessInfo.processInfo.operatingSystemVersionString.UTF8String;
-        char version[96];std::snprintf(version,sizeof(version),"pso-shards-14db-ios-v1-%llx",(unsigned long long)XXH3_64bits(identity.data(),identity.size()));
+        char version[96];std::snprintf(version,sizeof(version),"pso-shards-14db-ios-v2-tess-%llx",(unsigned long long)XXH3_64bits(identity.data(),identity.size()));
         root=cache/version;std::error_code ec;std::filesystem::create_directories(root,ec);if(ec)return;
         for(std::filesystem::directory_iterator i(root,ec),end;!ec&&i!=end;i.increment(ec)){
             auto path=i->path();
@@ -132,7 +139,7 @@ public:
             }else if(path.extension()==".tmp"){std::filesystem::remove(path,ec);ec.clear();}
         }
         Sweep();on=true;writer=std::thread{[this]{Loop();}};
-        std::puts("iOS PSO cache: bounded shards enabled; entry <=1 MiB, disk budget 128 MiB/2048 entries, queue <=64; no bulk archive loaded");
+        std::puts("iOS PSO cache: bounded shards enabled; entry <=1 MiB, disk budget 128 MiB/2048 entries, queue <=64; persist >=8 ms; paced writer; no bulk archive loaded");
 #else
         (void)cache;
 #endif
@@ -161,9 +168,11 @@ public:
         }
         if(!state){
             {std::scoped_lock lock{queue_mutex};++building;last_creation=Clock::now();cv.notify_one();}
-            ++misses;ns_error=nil;desc.binaryArchives=nil;state=create(MTLPipelineOptionNone,&ns_error);
+            ++misses;ns_error=nil;desc.binaryArchives=nil;auto compile_started=Clock::now();state=create(MTLPipelineOptionNone,&ns_error);
+            auto compile_us=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-compile_started).count());
             std::scoped_lock lock{queue_mutex};--building;last_creation=Clock::now();
-            if(state&&Headroom()&&CanQueue(queue.size()))queue.push_back({path,[desc copy]});else ++dropped;
+            if(state&&!WorthPersisting(compile_us))++fast_skipped;
+            else if(state&&Headroom()&&CanQueue(queue.size()))queue.push_back({path,[desc copy]});else ++dropped;
             cv.notify_one();
         }
         if(!state)error=ns_error?ns_error.localizedDescription.UTF8String:"Metal pipeline creation failed";
@@ -171,3 +180,4 @@ public:
     }
 };
 }
+

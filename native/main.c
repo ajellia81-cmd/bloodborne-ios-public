@@ -7,6 +7,7 @@
 #include "display.h"
 #include "lifecycle.h"
 #include "locale.h"
+#include "haptics.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,7 +34,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 17; Korean Default, bounded per-pipeline Metal cache and same-key build coalescing.");
+    puts("Bloodborne iOS build 18; costly-PSO persistence, paced cache writes, early haptics, complete tessellation patch layout.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
@@ -72,6 +73,7 @@ int main(int argc,char **argv) {
     SDL_JoystickID *gamepad_ids=SDL_GetGamepads(&gamepad_count);
     for(int i=0;gamepad_ids && i<gamepad_count;i++) {
         SDL_Gamepad *pad=SDL_OpenGamepad(gamepad_ids[i]);
+        bb_ios_haptic_warmup(pad);
         fprintf(stdout,"Launcher gamepad %u: %s\n",(unsigned)gamepad_ids[i],pad ? SDL_GetGamepadName(pad) : SDL_GetError());
     }
     SDL_free(gamepad_ids);
@@ -105,6 +107,7 @@ int main(int argc,char **argv) {
         while (SDL_PollEvent(&event)) {
             if(event.type==SDL_EVENT_GAMEPAD_ADDED) {
                 SDL_Gamepad *pad=SDL_OpenGamepad(event.gdevice.which);
+                bb_ios_haptic_warmup(pad);
                 fprintf(stdout,"Launcher gamepad added: %s\n",pad ? SDL_GetGamepadName(pad) : SDL_GetError());
             }
             if(event.type==SDL_EVENT_GAMEPAD_REMOVED) {
@@ -152,6 +155,7 @@ int main(int argc,char **argv) {
     bb_diagnostic_mark("game runtime returned");
     return result;
 }
+
 
 
 
