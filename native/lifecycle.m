@@ -65,6 +65,7 @@ void bb_ios_note_frame(void){
     pthread_mutex_unlock(&frame_stats_lock);
 }
 
+static void resume_game(void);
 static void pause_game(void) {
     if (inactive) return;
     // UIKit can notify reentrantly while this thread owns a drawable transaction.
@@ -74,7 +75,13 @@ static void pause_game(void) {
         bb_ios_set_background(1);
         if (!deferred) {
             deferred=1;
-            dispatch_async(dispatch_get_main_queue(),^{ deferred=0;pause_game(); });
+            dispatch_async(dispatch_get_main_queue(),^{
+                deferred=0;
+                if (UIApplication.sharedApplication.applicationState==UIApplicationStateActive) {
+                    resume_game();
+                    if (!inactive) bb_ios_set_background(0);
+                } else pause_game();
+            });
         }
         return;
     }
