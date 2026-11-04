@@ -114,10 +114,11 @@ change('gpu/shim/window.cpp','void WindowSDL::CaptureMouse(bool capture) {',
 print('iOS lifecycle: guest checkpoints, foreground Metal leases, queue drain bridge, audio pause/reset')
 
 
-# Avoid deferred patch draws across subsequent kernel/binding changes on iOS.
-p=metal/'mtl_frame.mm';s=p.read_text()
-needle='    o.last_draw_tess = true;\n}'
+# Preserve batching: make local-to-hull scratch dependency explicit on iOS.
+p=metal/'mtl_tessellation.mm';s=p.read_text()
+s='#include <TargetConditionals.h>\n'+s
+needle='                       scratch_offset + plan.vertex_offset, bind_vertex);'
 assert s.count(needle)==1
-s=s.replace(needle, '    o.last_draw_tess = true;\n#if TARGET_OS_IPHONE\n    FlushPending(o); // keep this draw contiguous with its vertex/hull kernels\n#endif\n}')
+s=s.replace(needle,needle+'\n#if TARGET_OS_IPHONE\n    id<MTLResource> dependency = scratch_buffer;\n    [enc memoryBarrierWithResources:&dependency count:1];\n#endif\n')
 p.write_text(s)
-print('iOS Metal: retained command-buffer resources; contiguous tessellation draws')
+print('iOS Metal: retained command-buffer resources; local/hull scratch dependency barrier, batching preserved')

@@ -34,7 +34,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 20; retained GPU resources, contiguous tessellation, read-only PSO cache.");
+    puts("Bloodborne iOS build 20; retained GPU resources, tessellation dependency barrier, read-only PSO cache.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
@@ -45,6 +45,8 @@ int main(int argc,char **argv) {
     setenv("BB_IOS_PSO_SHARDS","1",1);
     setenv("BB_IOS_PSO_WRITE","0",1);
     setenv("BB_AUDIO_STATS","1",1);
+    setenv("BB_VK_RECORD_THREADS","2",1);
+    setenv("BB_FRAMES_AHEAD","2",1);
     puts("iOS memory: monolithic archive off; bounded per-pipeline disk cache enabled");
     setenv("BB_FULLSCREEN","1",1);
     setenv("BB_RETINA","1",1);
