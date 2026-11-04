@@ -8,3 +8,6 @@ void bb_ios_gpu_quiesce_begin(void);
 int bb_ios_is_background(void);
 
 extern void (*bb_ios_main_pump)(void);
+
+
+int bb_ios_gpu_in_lease(void);

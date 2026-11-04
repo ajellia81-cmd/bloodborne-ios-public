@@ -10,6 +10,7 @@
 extern void runtime_audio_set_paused(int paused);
 static NSMutableSet<id<MTLCommandQueue>> *queues;
 static int inactive;
+static pthread_mutex_t queue_registry_lock=PTHREAD_MUTEX_INITIALIZER;
 static void memory_report(const char *stage) {
     task_vm_info_data_t info={0};mach_msg_type_number_t count=TASK_VM_INFO_COUNT;
     if(task_info(mach_task_self(),TASK_VM_INFO,(task_info_t)&info,&count)==KERN_SUCCESS)
@@ -22,8 +23,10 @@ static void memory_report(const char *stage) {
 void bb_ios_metal_commit_locked(void *buffer) {
     id<MTLCommandBuffer> command = (__bridge id<MTLCommandBuffer>)buffer;
     if (!command) { fprintf(stderr,"iOS Metal: nil command buffer (allocation failed)\n"); return; }
+    pthread_mutex_lock(&queue_registry_lock);
     if (!queues) queues = [NSMutableSet new];
     [queues addObject:command.commandQueue];
+    pthread_mutex_unlock(&queue_registry_lock);
     [command addCompletedHandler:^(id<MTLCommandBuffer> completed) {
         if (completed.status == MTLCommandBufferStatusError) {
             fprintf(stderr,"iOS Metal command failed: label=%s gpu=%.2f ms; %s\n",completed.label.UTF8String,1000.0*(completed.GPUEndTime-completed.GPUStartTime),completed.error.description.UTF8String);
@@ -64,6 +67,17 @@ void bb_ios_note_frame(void){
 
 static void pause_game(void) {
     if (inactive) return;
+    // UIKit can notify reentrantly while this thread owns a drawable transaction.
+    // Close admission now and drain after that transaction unwinds.
+    if (bb_ios_gpu_in_lease()) {
+        static int deferred;
+        bb_ios_set_background(1);
+        if (!deferred) {
+            deferred=1;
+            dispatch_async(dispatch_get_main_queue(),^{ deferred=0;pause_game(); });
+        }
+        return;
+    }
     inactive=1;
     reset_frame_stats();
     memory_report("inactive");
@@ -118,4 +132,5 @@ void bb_ios_lifecycle_install(void) {
         if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) pause_game();
     });
 }
+
 

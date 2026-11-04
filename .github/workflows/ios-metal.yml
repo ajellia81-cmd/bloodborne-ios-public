@@ -73,6 +73,8 @@ jobs:
           output/pso-cache-test
           clang -std=c11 -Wall -Wextra -Werror -pthread -Inative native/lifecycle.c tests/lifecycle_gate.c -o output/lifecycle-test
           output/lifecycle-test
+          clang -std=c11 -Wall -Wextra -Werror -pthread -Inative native/lifecycle.c tests/lifecycle_parallel.c -o output/lifecycle-parallel-test
+          output/lifecycle-parallel-test
           clang -std=c11 -Wall -Wextra -Werror -pthread -Inative native/locale.c tests/locale_selection.c -o output/locale-test
           output/locale-test
       - name: Install host shader tools
@@ -154,6 +156,7 @@ jobs:
             output/*.txt
             output/*.log
           retention-days: 14
+
 
 
 

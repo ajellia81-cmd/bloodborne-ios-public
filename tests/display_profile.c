@@ -24,13 +24,20 @@ int main(void) {
     assert(strstr(text,"live_resolution=0"));
     assert(strstr(text,"upscaler=metalfx") && strstr(text,"preset=3"));
     assert(!strcmp(getenv("BB_UPSCALER"),"metalfx"));
+    assert(strstr(text,"effect_ssao=1")&&strstr(text,"effect_ssr=0")&&strstr(text,"model_lod=0"));
+    f=fopen(path,"a");assert(f);fputs("preset=4\neffect_ssao=0\n",f);assert(!fclose(f));
+    assert(!bb_ios_screen_profile((SDL_Window *)&landscape,path));
+    assert(!strcmp(getenv("BB_RENDER_RES"),"956x440"));
+    f=fopen(path,"r");assert(f);memset(text,0,sizeof(text));assert(fread(text,1,sizeof(text)-1,f)>0);fclose(f);
+    assert(strstr(text,"effect_ssao=0")&&strstr(text,"preset=4"));
     Display small={960,540};assert(!bb_ios_screen_profile((SDL_Window *)&small,path));
     assert(!strcmp(getenv("BB_RENDER_RES"),"960x540"));
     assert(!strcmp(getenv("BB_UPSCALER"),"off"));
     assert(bb_ios_screen_profile((SDL_Window *)&invalid,path)<0);
     assert(bb_ios_screen_profile((SDL_Window *)&landscape,"/no-such-bb-directory/settings.ini")<0);
-    unlink(path);rmdir(dir);
+    char marker[600];snprintf(marker,sizeof(marker),"%s.ps4-defaults-v1",path);unlink(marker);unlink(path);rmdir(dir);
     puts("PASS: native output, half-size scene, MetalFX profile, small-display fallback, aspect and settings preservation");
     return 0;
 }
+
 
