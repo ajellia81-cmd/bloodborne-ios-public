@@ -32,3 +32,18 @@ needle='    BbStats::frame_number.fetch_add(1, std::memory_order_relaxed); // bb
 assert s.count(needle)==1
 s=s.replace(needle,needle+'\n    bb_ios_note_frame();');p.write_text(s)
 print('iOS observers: first nonzero rumble timings; lightweight game-frame interval observer')
+
+# Larger iOS queue reserve; preserve the guest output cadence and mixer ordering.
+p=Path('upstream-runtime/src/runtime_audio.c');s=p.read_text()
+s='#include <TargetConditionals.h>\n'+s
+needle='int low=2*(int)bytes, queued=SDL_GetAudioStreamQueued(p->stream);'
+assert s.count(needle)==1
+s=s.replace(needle,'int reserve=2;\n#if TARGET_OS_IPHONE\n            reserve=4;\n#endif\n            int low=reserve*(int)bytes, queued=SDL_GetAudioStreamQueued(p->stream);')
+needle='                SDL_PutAudioStreamData(p->stream,silence,low-queued<(int)bytes ? low-queued : (int)bytes);\n                queued=low;'
+assert s.count(needle)==1
+s=s.replace(needle,'                int fill=low-queued<(int)bytes ? low-queued : (int)bytes;\n                if(SDL_PutAudioStreamData(p->stream,silence,fill))queued+=fill;\n                else fprintf(stderr,"iOS audio silence enqueue failed: %s\\n",SDL_GetError());')
+needle='            SDL_PutAudioStreamData(p->stream,converted,(int)bytes);'
+assert s.count(needle)==1
+s=s.replace(needle,'            if(!SDL_PutAudioStreamData(p->stream,converted,(int)bytes))\n                fprintf(stderr,"iOS audio enqueue failed: %s\\n",SDL_GetError());')
+p.write_text(s)
+print('iOS audio: four-buffer reserve, accurate partial-refill accounting, enqueue diagnostics')

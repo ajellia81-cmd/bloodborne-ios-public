@@ -30,7 +30,7 @@ class Shards {
     std::mutex load_mutex,queue_mutex,report_mutex;
     std::condition_variable cv;
     std::deque<Job> queue;
-    bool stop=false,on=false;
+    bool stop=false,on=false,persist=false;
     unsigned building=0;
     std::thread writer;
     using Clock=std::chrono::steady_clock;
@@ -138,8 +138,10 @@ public:
                 path.replace_extension(".bin");std::filesystem::remove(path,ec);ec.clear();std::filesystem::remove(i->path(),ec);ec.clear();
             }else if(path.extension()==".tmp"){std::filesystem::remove(path,ec);ec.clear();}
         }
-        Sweep();on=true;writer=std::thread{[this]{Loop();}};
-        std::puts("iOS PSO cache: bounded shards enabled; entry <=1 MiB, disk budget 128 MiB/2048 entries, queue <=64; persist >=8 ms; paced writer; no bulk archive loaded");
+        Sweep();on=true;
+        const char* save=std::getenv("BB_IOS_PSO_WRITE");persist=save&&save[0]=='1';
+        if(persist)writer=std::thread{[this]{Loop();}};
+        std::puts("iOS PSO cache: bounded shards enabled; entry <=1 MiB, disk budget 128 MiB/2048 entries, queue <=64; persistence opt-in; default read-only; no bulk archive loaded");
 #else
         (void)cache;
 #endif
@@ -172,6 +174,7 @@ public:
             auto compile_us=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-compile_started).count());
             std::scoped_lock lock{queue_mutex};--building;last_creation=Clock::now();
             if(state&&!WorthPersisting(compile_us))++fast_skipped;
+            else if(state&&!persist)++fast_skipped;
             else if(state&&Headroom()&&CanQueue(queue.size()))queue.push_back({path,[desc copy]});else ++dropped;
             cv.notify_one();
         }

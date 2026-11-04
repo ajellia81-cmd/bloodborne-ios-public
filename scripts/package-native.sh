@@ -28,7 +28,7 @@ python3 - "$app/Info.plist" <<'PY'
 import plistlib,sys
 p=sys.argv[1]
 with open(p,"rb") as f: info=plistlib.load(f)
-info["CFBundleVersion"]="18"
+info["CFBundleVersion"]="19"
 info["UIApplicationSupportsIndirectInputEvents"]=True
 info["CFBundleName"]="Bloodborne"
 info["CFBundleDisplayName"]="Bloodborne"
