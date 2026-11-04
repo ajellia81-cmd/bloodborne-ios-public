@@ -37,8 +37,10 @@ extern "C" void bb_ios_metal_commit_locked(void*);
 extern "C" void bb_ios_gpu_begin(void);
 extern "C" void bb_ios_gpu_end(void);
 #define BB_IOS_COMMIT(command) bb_ios_metal_commit((__bridge void*)(command))
+#define BB_IOS_NEW_COMMAND(q) [(q) commandBuffer]
 #else
 #define BB_IOS_COMMIT(command) [(command) commit]
+#define BB_IOS_NEW_COMMAND(q) [(q) commandBufferWithUnretainedReferences]
 #endif
 '''
 metal=root/'gpu/shadps4/video_core/renderer_metal'
@@ -66,6 +68,10 @@ for name in ['mtl_vk_layer.mm','mtl_frame.mm','mtl_present.mm','mtl_device.mm']:
         s=s.replace('[(__bridge id<MTLCommandBuffer>)command_buffer commit];','BB_IOS_COMMIT((__bridge id<MTLCommandBuffer>)command_buffer);')
         for command in ['cmd','o->cmd','o.cmd','prime']:
             s=s.replace(f'[{command} commit];',f'BB_IOS_COMMIT({command});')
+    # iOS capture/memory-pressure must not retire bound resources before GPU completion.
+    # Preserve the upstream macOS ownership policy.
+    s=s.replace('[queue commandBufferWithUnretainedReferences]', 'BB_IOS_NEW_COMMAND(queue)')
+    s=s.replace('[o->queue commandBufferWithUnretainedReferences]', 'BB_IOS_NEW_COMMAND(o->queue)')
     p.write_text(s)
 
 # Audio stream lifetime is protected by the existing port table and per-port locks.
@@ -106,3 +112,12 @@ change('gpu/shim/window.cpp','void WindowSDL::CaptureMouse(bool capture) {',
     return;
 #endif''')
 print('iOS lifecycle: guest checkpoints, foreground Metal leases, queue drain bridge, audio pause/reset')
+
+
+# Avoid deferred patch draws across subsequent kernel/binding changes on iOS.
+p=metal/'mtl_frame.mm';s=p.read_text()
+needle='    o.last_draw_tess = true;\n}'
+assert s.count(needle)==1
+s=s.replace(needle, '    o.last_draw_tess = true;\n#if TARGET_OS_IPHONE\n    FlushPending(o); // keep this draw contiguous with its vertex/hull kernels\n#endif\n}')
+p.write_text(s)
+print('iOS Metal: retained command-buffer resources; contiguous tessellation draws')

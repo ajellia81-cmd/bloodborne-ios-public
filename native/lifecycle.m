@@ -26,7 +26,7 @@ void bb_ios_metal_commit_locked(void *buffer) {
     [queues addObject:command.commandQueue];
     [command addCompletedHandler:^(id<MTLCommandBuffer> completed) {
         if (completed.status == MTLCommandBufferStatusError) {
-            fprintf(stderr,"iOS Metal command failed: %s\n",completed.error.description.UTF8String);
+            fprintf(stderr,"iOS Metal command failed: label=%s gpu=%.2f ms; %s\n",completed.label.UTF8String,1000.0*(completed.GPUEndTime-completed.GPUStartTime),completed.error.description.UTF8String);
         }
     }];
     [command commit];

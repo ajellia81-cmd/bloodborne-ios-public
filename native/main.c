@@ -34,7 +34,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 19; costly-PSO persistence, paced cache writes, early haptics, complete tessellation patch layout.");
+    puts("Bloodborne iOS build 20; retained GPU resources, contiguous tessellation, read-only PSO cache.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
