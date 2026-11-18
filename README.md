@@ -1,5 +1,14 @@
 # Bloodborne iOS experimental runtime
 
+## Build 22 — iOS build verified; device performance pending
+
+- Exact byte-range GPU read tracking avoids false ring-buffer conflicts and unnecessary G-buffer pass splits.
+- Attachment-aware native Metal barriers preserve open render passes when no graphics write or attachment dependency requires a split. Actual dependencies remain enforced.
+- ISA-unused GPU descriptor formats use existing invalid-resource handling, addressing the reported format-15 assertion path.
+- PS4 effects/LOD defaults, native 2868 × 1320 output, existing MetalFX Performance internal 1434 × 660 profile and 30 FPS target are unchanged. Saved user settings remain intact.
+- [Full iOS Metal build and checks passed](https://github.com/ajellia81-cmd/bloodborne-ios-public/actions/runs/44266433945) for source `9569162bbcc32a1596e352bc6a5c8e39d8f7e368`. Sustained phone FPS, stutter improvement and crash resolution require device testing.
+- [Changes, upstream backports and verification limits](docs/build22.md). Game data and private AOT remain outside public source and Actions artifacts.
+
 ## Build 18 — fixes and diagnostics candidate; device verification pending
 
 - Latest build17 device log: PSO writes 245, hits 3, misses 455, skipped writes 196; individual creation reached 378.82 ms. This log contains one build17 startup and does not establish cross-launch cache effectiveness. The screenshot reports 28 FPS / 36 ms in Hunter's Dream, with stretched/occluding world geometry and intact HUD.
