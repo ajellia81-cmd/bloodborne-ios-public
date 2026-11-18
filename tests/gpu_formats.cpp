@@ -20,7 +20,8 @@ static_assert(remaps_match_isa());
 int main() {
  AmdGpu::ColorBuffer color{};
  color.base_address=0x1000;
- for (unsigned i=0;i<64;++i) {
+ // CB_COLOR_INFO has a 5-bit format field; sampled descriptors use 6 bits.
+ for (unsigned i=0;i<32;++i) {
   color.info.format=i;
   assert(static_cast<bool>(color) == (expected[i] != 0));
  }
