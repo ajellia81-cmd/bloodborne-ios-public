@@ -1,0 +1,42 @@
+diff --git a/gpu/shadps4/video_core/amdgpu/pixel_format.h b/gpu/shadps4/video_core/amdgpu/pixel_format.h
+--- a/gpu/shadps4/video_core/amdgpu/pixel_format.h
++++ b/gpu/shadps4/video_core/amdgpu/pixel_format.h
+@@ -208,6 +208,13 @@ constexpr DataFormat RemapDataFormat(const DataFormat format) {
+     case DataFormat::Format5_5_5_1:
+         return DataFormat::Format1_5_5_5;
+     default:
++        // bbport: values the ISA leaves unused (15, 23-31, 42, 43) come only from a stale
++        // descriptor the game is rewriting; they read as invalid (a null texture, a skipped
++        // vertex buffer, zeros from a buffer load) instead of stopping the game (issue #11).
++        if (const u32 value = static_cast<u32>(format);
++            value == 15 || (value >= 23 && value <= 31) || value == 42 || value == 43) {
++            return DataFormat::FormatInvalid;
++        }
+         return format;
+     }
+ }
+diff --git a/gpu/shadps4/video_core/amdgpu/regs_color.h b/gpu/shadps4/video_core/amdgpu/regs_color.h
+--- a/gpu/shadps4/video_core/amdgpu/regs_color.h
++++ b/gpu/shadps4/video_core/amdgpu/regs_color.h
+@@ -197,7 +197,8 @@ struct ColorBuffer {
+     std::array<u32, 2> pad1;
+ 
+     operator bool() const {
+-        return base_address && info.format;
++        // bbport: an unused format value reads as no target (RemapDataFormat).
++        return base_address && GetDataFmt() != DataFormat::FormatInvalid;
+     }
+ 
+     u32 Pitch() const {
+diff --git a/gpu/shadps4/video_core/renderer_vulkan/liverpool_to_vk.cpp b/gpu/shadps4/video_core/renderer_vulkan/liverpool_to_vk.cpp
+--- a/gpu/shadps4/video_core/renderer_vulkan/liverpool_to_vk.cpp
++++ b/gpu/shadps4/video_core/renderer_vulkan/liverpool_to_vk.cpp
+@@ -790,7 +790,7 @@ Backend::Format SurfaceFormat(AmdGpu::DataFormat data_format, AmdGpu::NumberForm
+     if (result != Backend::Format::Undefined || data_format == AmdGpu::DataFormat::FormatInvalid) {
+         return result;
+     }
+-    // bbport: a combination no real descriptor has (seen: data_format=6/num_format=1 and 15/4),
++    // bbport: a combination no real descriptor has (seen: data_format=6/num_format=1),
+     // read from game memory the game may be rewriting (a stale sharp). It stopped the game; now
+     // the same data format with a number format that exists keeps the element size, and that
+     // draw reads garbage for a frame. Same approach as Supermedo/bloodborne_pc 3e3b760

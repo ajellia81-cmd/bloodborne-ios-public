@@ -19,6 +19,9 @@ on:
       - 'tests/locale_selection.c'
       - 'scripts/patch-ios-tessellation.py'
       - 'scripts/patch-ios-observers.py'
+      - 'scripts/patch-ios-formats-performance.py'
+      - 'scripts/backports/**'
+      - 'tests/gpu_formats.cpp'
       - 'tests/tess*'
       - 'tests/haptics_warmup.c'
       - 'tests/haptic_mock/**'
@@ -65,6 +68,7 @@ jobs:
           python3 scripts/patch-ios-pso-cache.py
           python3 scripts/patch-ios-tessellation.py
           python3 scripts/patch-ios-observers.py
+          python3 scripts/patch-ios-formats-performance.py
           clang++ -std=c++20 -Wall -Wextra -Werror -Inative tests/tess_inputs.cpp -o output/tess-inputs-test
           output/tess-inputs-test
           clang -std=c11 -Wall -Wextra -Werror -Itests/haptic_mock -Inative native/haptics.c tests/haptics_warmup.c -o output/haptics-test
@@ -105,6 +109,10 @@ jobs:
             upstream-runtime/deps/ios-arm64
             upstream-runtime/deps/build-ios
           key: ${{ steps.ios-deps-cache.outputs.cache-primary-key }}
+      - name: Check real GPU descriptor format handling
+        run: |
+          clang++ -std=c++20 -Wall -Wextra -Werror -DFMT_HEADER_ONLY -Iupstream-runtime/gpu/shim -Iupstream-runtime/gpu/shadps4 -Iupstream-runtime/deps/ios-arm64/include tests/gpu_formats.cpp -o output/gpu-formats-test
+          output/gpu-formats-test
       - name: Check native display profile behavior
         run: |
           set -euo pipefail
@@ -114,7 +122,7 @@ jobs:
         id: ios-gpu-cache
         with:
           path: upstream-runtime/out/ios/gpu
-          key: ios-gpu-xcode26.3-${{ steps.runtime_pin.outputs.sha }}-${{ hashFiles('output/runtime-sha.txt', 'upstream-runtime/deps/packages.cmake', 'scripts/patch-ios-touch-menu.py', 'scripts/patch-ios-lifecycle.py', 'scripts/patch-ios-streaming.py', 'scripts/patch-ios-pso-cache.py', 'native/pso_shards.h', 'native/pso_cache_policy.h', 'scripts/patch-ios-tessellation.py', 'scripts/patch-ios-observers.py', 'native/tess_inputs.h') }}
+          key: ios-gpu-xcode26.3-${{ steps.runtime_pin.outputs.sha }}-${{ hashFiles('output/runtime-sha.txt', 'upstream-runtime/deps/packages.cmake', 'scripts/patch-ios-touch-menu.py', 'scripts/patch-ios-lifecycle.py', 'scripts/patch-ios-streaming.py', 'scripts/patch-ios-pso-cache.py', 'native/pso_shards.h', 'native/pso_cache_policy.h', 'scripts/patch-ios-tessellation.py', 'scripts/patch-ios-observers.py', 'native/tess_inputs.h', 'scripts/patch-ios-formats-performance.py', 'scripts/backports/*.patch') }}
           restore-keys: |
             ios-gpu-xcode26.3-${{ steps.runtime_pin.outputs.sha }}-
             ${{ steps.runtime_pin.outputs.sha == '14dbd84263b3a08d001eb7fb1128e98f4c5f2be9' && 'ios-gpu-xcode26.3-add0b2e81d964111cccd227c63e2d2161aa4afb4aa2d4421229a1168302a9e0f' || '' }}
