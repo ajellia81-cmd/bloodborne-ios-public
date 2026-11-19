@@ -1,0 +1,93 @@
+--- a/gpu/shim/bbport_frame_rate.cpp
++++ b/gpu/shim/bbport_frame_rate.cpp
+@@ -29,6 +29,7 @@
+ #include <algorithm>
+ #include <atomic>
+ #include <cmath>
++#include <chrono>
+ #include <cstddef>
+ #include <cstdio>
+ #include <cstdlib>
+@@ -42,6 +43,7 @@
+ using u8 = std::uint8_t;
+ 
+ std::atomic<bool> unlocked{false};
++bool adaptive30 = false;
+ u64 image_base = 0;
+ 
+ constexpr float Frame30 = 1.0f / 30.0f;
+@@ -86,6 +88,29 @@
+         smoothed = smoothed > 0.0f ? smoothed + smooth * (dt - smoothed) : dt;
+         dt = std::clamp(smoothed, live->shortest, Frame30);
+     }
++    if (adaptive30) {
++        using Clock = std::chrono::steady_clock;
++        const auto now = Clock::now();
++        static auto last = now;
++        static double wall_sum = 0, step_sum = 0;
++        static unsigned steps = 0;
++        const double elapsed = std::chrono::duration<double>(now - last).count();
++        last = now;
++        // Discard suspension/loading gaps. Limit physics integration to 50 ms.
++        dt = elapsed > 0 && elapsed <= 0.25
++                 ? std::clamp(float(elapsed), ShortestFrame, 0.05f) : Frame30;
++        if (elapsed > 0 && elapsed <= 0.25) {
++            wall_sum += elapsed;
++            step_sum += dt;
++            ++steps;
++            if (wall_sum >= 5.0) {
++                std::printf("iOS simulation: %u main-loop steps, %.3f s applied / %.3f s active wall time\n",
++                            steps, step_sum, wall_sum);
++                wall_sum = step_sum = 0;
++                steps = 0;
++            }
++        }
++    }
+     const float frames = dt * 30.0f; // the frame's length in 30 FPS frames
+     live->dt = dt;
+     const float decay95 = std::pow(0.95f, frames);
+@@ -396,7 +421,9 @@
+     const char* fps = std::getenv("BB_FPS");
+     const char* hooks = std::getenv("BB_FRAME_HOOKS");
+     const int mode = !fps || std::strcmp(fps, "uncap") == 0 ? MaxRate : std::atoi(fps);
+-    if (mode <= 30 || (hooks && hooks[0] == '0')) {
++    const char* adapt = std::getenv("BB_IOS_ADAPTIVE_30");
++    adaptive30 = mode == 30 && adapt && std::strcmp(adapt, "1") == 0;
++    if ((mode <= 30 && !adaptive30) || (hooks && hooks[0] == '0')) {
+         return;
+     }
+     image_base = reinterpret_cast<u64>(image);
+@@ -420,13 +447,15 @@
+     live->shortest = 1.0f / float(rate);
+     base_rate = rate;
+     // The core first: without all three the game keeps its own frame rate.
+-    if (!(HookPacerMode() && HookPacerLate() && HookStep())) {
++    if ((!adaptive30 && !(HookPacerMode() && HookPacerLate())) || !HookStep()) {
+         std::printf("Frame rate: the game's frame pacer is not the expected code: 30 FPS\n");
+-        mprotect(stub_page, StubPageSize, PROT_READ | PROT_EXEC);
++        mprotect(stub_page, StubPageSize, adaptive30 ? PROT_READ : (PROT_READ | PROT_EXEC));
+         return;
+     }
+-    unlocked = true;
+-    BbSettings::SetLiveFpsLimit(SetLimit);
++    if (!adaptive30) {
++        unlocked = true;
++        BbSettings::SetLiveFpsLimit(SetLimit);
++    }
+     int steps = HookFixedStep(0x17f9b71, -0x48) + HookFixedStep(0x1572a7d, -0x30);
+     const int run = HookRunSpeed();
+     const bool cloth = HookClothStiffness();
+@@ -442,7 +471,12 @@
+             std::printf("Frame rate: %#llx is not the expected code, left as it is\n", (unsigned long long)r.site);
+         }
+     }
+-    mprotect(stub_page, StubPageSize, PROT_READ | PROT_EXEC);
++    mprotect(stub_page, StubPageSize, adaptive30 ? PROT_READ : (PROT_READ | PROT_EXEC));
++    if (adaptive30) {
++        std::printf("iOS adaptive simulation: original 30 FPS pacing, 50 ms maximum step; %d fixed steps and %d/%zu redirects\n",
++                    steps, redirected, std::size(Redirects));
++        return;
++    }
+     std::printf("Frame rate: free (hooks, no patches): the game steps by each frame's time "
+                 "(1/%.0f..1/30 s); %d fixed steps, %d of %zu per-frame values follow the frame's "
+                 "time, the run's wall check %s\n",

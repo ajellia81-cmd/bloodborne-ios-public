@@ -34,7 +34,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 26; Metal encoder bindings and submission timing.");
+    puts("Bloodborne iOS build 27; adaptive simulation with original 30 FPS pacing.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
@@ -61,6 +61,7 @@ int main(int argc,char **argv) {
     setenv("BB_UI_SCALE","1.75",1);
     setenv("BB_ONLINE","0",1);
     setenv("BB_FPS","30",1);
+    setenv("BB_IOS_ADAPTIVE_30","1",1);
     setenv("BB_FPS_LIMIT","30",1);
     setenv("BB_UPSCALER","metalfx",1);
     setenv("BB_UPSCALE_PRESET","3",1);
