@@ -1,0 +1,51 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
+@@ -15,2 +15,3 @@
+ #include <array>
++#include <boost/container/flat_map.hpp>
+ #include <boost/container/small_vector.hpp>
+@@ -98,3 +99,3 @@
+     /// Push descriptors by (set << 16 | binding), per bind point.
+-    std::unordered_map<u32, Binding> graphics_bindings, compute_bindings;
++    boost::container::flat_map<u32, Binding> graphics_bindings, compute_bindings;
+ 
+@@ -111,4 +112,4 @@
+     // Dynamic state (as the Vulkan side set it).
+-    std::vector<VkViewport> viewports;
+-    std::vector<VkRect2D> scissors;
++    boost::container::small_vector<VkViewport, 1> viewports;
++    boost::container::small_vector<VkRect2D, 1> scissors;
+     VkCullModeFlags cull_mode{};
+@@ -133,5 +134,5 @@
+     std::array<u8, 256> push{};
+-    std::unordered_map<u32, Binding> bindings;
+-    std::vector<VkViewport> viewports;
+-    std::vector<VkRect2D> scissors;
++    boost::container::flat_map<u32, Binding> bindings;
++    boost::container::small_vector<VkViewport, 1> viewports;
++    boost::container::small_vector<VkRect2D, 1> scissors;
+     VkCullModeFlags cull_mode{};
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
+@@ -456,3 +456,3 @@
+ void BindStage(Owned& o, Stage stage, const Metal::CompiledShader* shader,
+-               const std::unordered_map<u32, Binding>& bindings) {
++               const boost::container::flat_map<u32, Binding>& bindings) {
+     if (!shader) {
+@@ -461,3 +461,5 @@
+     using Kind = Metal::ShaderBinding::Kind;
+-    std::array<u32, Metal::kMaxBuffers> sizes{};
++    std::array<u32, Metal::kMaxBuffers> sizes;
++    const bool needs_sizes = shader->buffer_size_buffer != ~0u;
++    if (needs_sizes) sizes.fill(0);
+     for (const auto& b : shader->bindings) {
+@@ -476,3 +478,3 @@
+                     SetBuffer(o, stage, bound->buffer, bound->offset, slot);
+-                    if (slot < sizes.size()) {
++                    if (needs_sizes && slot < sizes.size()) {
+                         sizes[slot] = u32(std::min<u64>(bound->size, 0xffffffffu));
+@@ -481,3 +483,3 @@
+                     SetBuffer(o, stage, null_buffer, 0, slot);
+-                    if (slot < sizes.size()) {
++                    if (needs_sizes && slot < sizes.size()) {
+                         sizes[slot] = u32(null_buffer.length);
