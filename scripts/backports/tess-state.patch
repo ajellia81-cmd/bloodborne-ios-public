@@ -1,0 +1,66 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
+@@ -14,4 +14,5 @@
+ 
+ #include <array>
++#include <boost/container/small_vector.hpp>
+ #include <atomic>
+ #include <memory>
+@@ -42,5 +43,6 @@
+ 
+ struct Binding {
+-    std::vector<Bound> elements; ///< array elements
++    using Elements = boost::container::small_vector<Bound, 1>;
++    Elements elements; ///< array elements
+ };
+ 
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
+@@ -1346,5 +1346,5 @@
+ namespace {
+ /// The Metal objects of one descriptor write, into `elements` (grown as needed).
+-void DecodeWrite(const VkWriteDescriptorSet& write, std::vector<Bound>& elements);
++void DecodeWrite(const VkWriteDescriptorSet& write, Binding::Elements& elements);
+ std::mutex sets_mutex;
+ std::unordered_map<VkDescriptorSet, std::unordered_map<u32, Binding>> descriptor_sets;
+@@ -1384,5 +1384,5 @@
+ 
+ namespace {
+-void DecodeWrite(const VkWriteDescriptorSet& write, std::vector<Bound>& elements) {
++void DecodeWrite(const VkWriteDescriptorSet& write, Binding::Elements& elements) {
+     {
+         if (elements.size() < write.dstArrayElement + write.descriptorCount) {
+@@ -1473,11 +1473,14 @@
+ 
+ namespace {
+-DrawSnap Snap(const Owned& o) {
++// An enqueued draw still needs its own snapshot. During a flush the current
++// state is restored immediately afterwards, so its containers can be moved.
++template <typename Owner>
++DrawSnap Snap(Owner&& o) {
+     DrawSnap s;
+     s.graphics = o.graphics;
+     s.push = o.push;
+-    s.bindings = o.graphics_bindings;
+-    s.viewports = o.viewports;
+-    s.scissors = o.scissors;
++    s.bindings = std::forward<Owner>(o).graphics_bindings;
++    s.viewports = std::forward<Owner>(o).viewports;
++    s.scissors = std::forward<Owner>(o).scissors;
+     s.cull_mode = o.cull_mode;
+     s.front_face = o.front_face;
+@@ -1726,5 +1729,5 @@
+     std::vector<PendingPatch> pending = std::move(o.pending);
+     o.pending.clear();
+-    DrawSnap current = Snap(o);
++    DrawSnap current = Snap(std::move(o));
+     for (PendingPatch& p : pending) {
+         Apply(o, std::move(p.snap));
+@@ -1745,4 +1748,7 @@
+     }
+     Apply(o, std::move(current));
++    // Keep the batch capacity for the next run, after releasing captured resources.
++    pending.clear();
++    if (o.pending.empty()) o.pending.swap(pending);
+ }
+ 

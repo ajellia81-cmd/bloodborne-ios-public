@@ -23,10 +23,18 @@ static void memory_report(const char *stage) {
 void bb_ios_metal_commit_locked(void *buffer) {
     id<MTLCommandBuffer> command = (__bridge id<MTLCommandBuffer>)buffer;
     if (!command) { fprintf(stderr,"iOS Metal: nil command buffer (allocation failed)\n"); return; }
-    pthread_mutex_lock(&queue_registry_lock);
-    if (!queues) queues = [NSMutableSet new];
-    [queues addObject:command.commandQueue];
-    pthread_mutex_unlock(&queue_registry_lock);
+    // The registry owns each queue for the app lifetime. Register on first use
+    // by this thread and whenever it switches queues.
+    static _Thread_local void *last_queue;
+    id<MTLCommandQueue> queue = command.commandQueue;
+    void *identity = (__bridge void *)queue;
+    if (last_queue != identity) {
+        pthread_mutex_lock(&queue_registry_lock);
+        if (!queues) queues = [NSMutableSet new];
+        [queues addObject:queue];
+        pthread_mutex_unlock(&queue_registry_lock);
+        last_queue = identity;
+    }
     [command addCompletedHandler:^(id<MTLCommandBuffer> completed) {
         if (completed.status == MTLCommandBufferStatusError) {
             fprintf(stderr,"iOS Metal command failed: label=%s gpu=%.2f ms; %s\n",completed.label.UTF8String,1000.0*(completed.GPUEndTime-completed.GPUStartTime),completed.error.description.UTF8String);
