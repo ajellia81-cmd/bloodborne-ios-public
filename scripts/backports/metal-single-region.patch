@@ -1,0 +1,103 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
+@@ -1799,32 +1799,44 @@
+     // Checked by sorting, not pairwise: a copy-shader call can carry thousands of small regions,
+     // and comparing every pair of them on the recording thread stalled frames (costly). Very long lists stay blits.
+     if (count > 1024) return false;
+-    using Span = std::pair<u64, u64>; // [start, end)
+-    std::vector<Span> writes, reads;
+-    writes.reserve(count);
+-    for (u32 i = 0; i < count; ++i) {
+-        const u64 d = dst_base + regions[i].dstOffset;
+-        writes.push_back({d, d + regions[i].size});
++    if (count == 1) {
++        // Fills and updates always have one region. Avoid sorting and heap allocations here.
++        const auto& region = regions[0];
+         if (src == dst) {
+-            const u64 r = src_base + regions[i].srcOffset;
+-            reads.push_back({r, r + regions[i].size});
++            const u64 read = src_base + region.srcOffset;
++            const u64 write = dst_base + region.dstOffset;
++            if (read < write + region.size && write < read + region.size) return false;
+         }
+-    }
+-    std::sort(writes.begin(), writes.end());
+-    for (size_t i = 1; i < writes.size(); ++i) {
+-        if (writes[i].first < writes[i - 1].second) return false; // two writes overlap
+-    }
+-    if (src == dst) {
+-        // Any read overlapping any write (the writes are sorted and disjoint now).
+-        for (const Span& r : reads) {
+-            auto it = std::upper_bound(writes.begin(), writes.end(), Span{r.first, ~0ull});
+-            if (it != writes.begin() && std::prev(it)->second > r.first) return false;
+-            if (it != writes.end() && it->first < r.second) return false;
++    } else {
++        using Span = std::pair<u64, u64>; // [start, end)
++        std::vector<Span> writes, reads;
++        writes.reserve(count);
++        for (u32 i = 0; i < count; ++i) {
++            const u64 d = dst_base + regions[i].dstOffset;
++            writes.push_back({d, d + regions[i].size});
++            if (src == dst) {
++                const u64 r = src_base + regions[i].srcOffset;
++                reads.push_back({r, r + regions[i].size});
++            }
++        }
++        std::sort(writes.begin(), writes.end());
++        for (size_t i = 1; i < writes.size(); ++i) {
++            if (writes[i].first < writes[i - 1].second) return false; // two writes overlap
++        }
++        if (src == dst) {
++            // Any read overlapping any write (the writes are sorted and disjoint now).
++            for (const Span& r : reads) {
++                auto it = std::upper_bound(writes.begin(), writes.end(), Span{r.first, ~0ull});
++                if (it != writes.begin() && std::prev(it)->second > r.first) return false;
++                if (it != writes.end() && it->first < r.second) return false;
++            }
+         }
+     }
+     struct Region { u64 src, dst; u32 end, width; };
+     static_assert(sizeof(Region) == 24);
+-    std::vector<Region> rows;
++    Region single_row{};
++    std::vector<Region> multi_rows;
++    if (count > 1) multi_rows.reserve(count);
+     u32 threads = 0;
+     for (u32 i = 0; i < count; ++i) {
+         const auto& r = regions[i];
+@@ -1832,7 +1844,9 @@
+         const u64 alignment = (src ? a : 0) | b | r.size;
+         const u32 width = !(alignment & 15) ? 16 : !(alignment & 3) ? 4 : 1;
+         threads += r.size / width;
+-        rows.push_back({a, b, threads, width});
++        const Region row{a, b, threads, width};
++        if (count == 1) single_row = row;
++        else multi_rows.push_back(row);
+     }
+     static id<MTLComputePipelineState> pipeline;
+     static std::once_flag once;
+@@ -1846,7 +1860,7 @@
+                            device uchar* dst [[buffer(1)]],
+                            constant Region* rows [[buffer(2)]],
+                            constant Args& a [[buffer(3)]], uint i [[thread_position_in_grid]]) {
+-    uint lo = 0, hi = a.count;
++    uint lo = 0, hi = a.count == 1 ? 0 : a.count;
+     while (lo < hi) {
+         uint mid = lo + (hi - lo) / 2;
+         if (i < rows[mid].end) hi = mid; else lo = mid + 1;
+@@ -1878,11 +1892,12 @@
+     [o.compute setComputePipelineState:pipeline];
+     [o.compute setBuffer:src ? src : dst offset:0 atIndex:0];
+     [o.compute setBuffer:dst offset:0 atIndex:1];
+-    const size_t bytes = rows.size() * sizeof(Region);
++    const Region* rows = count == 1 ? &single_row : multi_rows.data();
++    const size_t bytes = count * sizeof(Region);
+     if (bytes <= 4096) {
+-        [o.compute setBytes:rows.data() length:bytes atIndex:2];
++        [o.compute setBytes:rows length:bytes atIndex:2];
+     } else {
+-        id<MTLBuffer> table = [device newBufferWithBytes:rows.data() length:bytes
++        id<MTLBuffer> table = [device newBufferWithBytes:rows length:bytes
+                                                options:MTLResourceStorageModeShared];
+         if (!table) return false;
+         o.keep.push_back(table);
