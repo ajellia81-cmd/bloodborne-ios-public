@@ -1,0 +1,90 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
+@@ -52,6 +52,8 @@
+     void* depth_stencil{};
+     Metal::DepthStencilKey depth_key{};
+     u32 fill{~0u}, clip{~0u}, cull{~0u}, winding{~0u};
+-    u64 viewport_hash{}, scissor_hash{};
++    std::array<VkViewport, 16> viewport_inputs{};
++    std::array<VkRect2D, 16> scissor_inputs{};
++    u32 viewport_count{}, scissor_count{}, scissor_width{}, scissor_height{};
+     u32 ref_front{~0u}, ref_back{~0u};
+     float bias[3]{-1.0f, -1.0f, -1.0f};
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
+@@ -573,40 +573,39 @@
+ 
+     // Viewports and scissors (Metal: negative-height viewports keep Vulkan's y; scissors clamped).
+-    std::array<MTLViewport, 16> viewports;
+-    const u32 nv = u32(std::min<size_t>(o.viewports.size(), viewports.size()));
+-    for (u32 i = 0; i < nv; ++i) {
+-        const VkViewport& v = o.viewports[i];
+-        const auto m = Metal::RasterUtil::ToMetalViewport(v.x, v.y, v.width, v.height, v.minDepth,
+-                                                          v.maxDepth);
+-        viewports[i] = {m.origin_x, m.origin_y, m.width, m.height, m.znear, m.zfar};
+-    }
+-    if (nv) {
+-        const u64 hash = XXH3_64bits(viewports.data(), sizeof(MTLViewport) * nv) ^ nv;
+-        if (c.viewport_hash != hash) {
+-            c.viewport_hash = hash;
+-            [enc setViewports:viewports.data() count:nv];
+-        }
+-    }
+-    std::array<MTLScissorRect, 16> scissors;
+-    const u32 ns = u32(std::min<size_t>(o.scissors.size(), scissors.size()));
+-    for (u32 i = 0; i < ns; ++i) {
+-        const VkRect2D& s = o.scissors[i];
+-        Metal::RasterUtil::ScissorRect r;
+-        if (!Metal::RasterUtil::ClampScissor(s.offset.x, s.offset.y, s.extent.width,
+-                                             s.extent.height, o.target_width, o.target_height,
+-                                             r)) {
+-            ++stats.skipped_discard;
+-            return false;
+-        }
+-        scissors[i] = {r.x, r.y, r.width, r.height};
+-    }
+-    if (ns) {
+-        const u64 hash = XXH3_64bits(scissors.data(), sizeof(MTLScissorRect) * ns) ^ ns;
+-        if (c.scissor_hash != hash) {
+-            c.scissor_hash = hash;
+-            [enc setScissorRects:scissors.data() count:ns];
+-        }
+-    }
+-
++    const u32 nv = u32(std::min(o.viewports.size(), c.viewport_inputs.size()));
++    if (nv && (c.viewport_count != nv ||
++               std::memcmp(o.viewports.data(), c.viewport_inputs.data(), sizeof(VkViewport) * nv) != 0)) {
++        std::array<MTLViewport, 16> viewports;
++        for (u32 i = 0; i < nv; ++i) {
++            const VkViewport& v = o.viewports[i];
++            const auto m = Metal::RasterUtil::ToMetalViewport(v.x, v.y, v.width, v.height, v.minDepth,
++                                                              v.maxDepth);
++            viewports[i] = {m.origin_x, m.origin_y, m.width, m.height, m.znear, m.zfar};
++        }
++        [enc setViewports:viewports.data() count:nv];
++        std::memcpy(c.viewport_inputs.data(), o.viewports.data(), sizeof(VkViewport) * nv);
++        c.viewport_count = nv;
++    }
++    const u32 ns = u32(std::min(o.scissors.size(), c.scissor_inputs.size()));
++    if (ns && (c.scissor_count != ns || c.scissor_width != o.target_width || c.scissor_height != o.target_height ||
++               std::memcmp(o.scissors.data(), c.scissor_inputs.data(), sizeof(VkRect2D) * ns) != 0)) {
++        std::array<MTLScissorRect, 16> scissors;
++        for (u32 i = 0; i < ns; ++i) {
++            const VkRect2D& s = o.scissors[i];
++            Metal::RasterUtil::ScissorRect r;
++            if (!Metal::RasterUtil::ClampScissor(s.offset.x, s.offset.y, s.extent.width,
++                                                 s.extent.height, o.target_width, o.target_height,
++                                                 r)) {
++                ++stats.skipped_discard;
++                return false;
++            }
++            scissors[i] = {r.x, r.y, r.width, r.height};
++        }
++        [enc setScissorRects:scissors.data() count:ns];
++        std::memcpy(c.scissor_inputs.data(), o.scissors.data(), sizeof(VkRect2D) * ns);
++        c.scissor_count = ns;
++        c.scissor_width = o.target_width;
++        c.scissor_height = o.target_height;
++    }
+     // Depth and stencil.
+     Metal::DepthStencilKey ds;
