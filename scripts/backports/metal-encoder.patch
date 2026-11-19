@@ -1,0 +1,53 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
+@@ -59,4 +59,5 @@
+         void* object{};
+         u64 offset{};
++        u64 stride{}; ///< zero for ordinary bindings
+     };
+     std::array<Slot, 31> buffers[2]{};   ///< vertex, fragment
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
+@@ -64,5 +64,5 @@
+ /// only they are declared on each encoder (hazard tracking); all of them are kept resident by a
+ /// residency set on the queue, which pointer access needs and which costs nothing per encoder.
+-std::vector<id<MTLBuffer>> declared_buffers;
++std::vector<id<MTLResource>> declared_buffers;
+ id<MTLResidencySet> residency;
+ std::atomic<u32> address_generation{0};
+@@ -213,5 +213,5 @@
+         return;
+     }
+-    std::vector<id<MTLResource>> resources(declared_buffers.begin(), declared_buffers.end());
++    const auto& resources = declared_buffers;
+     if (render) {
+         // Render passes read guest memory through pointers; writes come from compute. Declaring
+@@ -366,5 +366,5 @@
+         auto& slot = o.cache.buffers[stage == Stage::Fragment][index];
+         const void* object = (__bridge void*)buffer;
+-        if (slot.object == object) {
++        if (slot.object == object && slot.stride == 0) {
+             if (slot.offset == offset) {
+                 return;
+@@ -667,11 +667,15 @@
+             stride = 16;
+         }
+-        [enc setVertexBuffer:vb.buffer ? vb.buffer : null_buffer
+-                      offset:vb.buffer ? vb.offset : 0
+-             attributeStride:stride
+-                     atIndex:slot.slot];
++        id<MTLBuffer> buffer = vb.buffer ? vb.buffer : null_buffer;
++        const u64 offset = vb.buffer ? vb.offset : 0;
+         if (slot.slot < c.buffers[0].size()) {
+-            c.buffers[0][slot.slot] = {}; // set with a stride: not a plain cached binding
+-        }
++            auto& cached = c.buffers[0][slot.slot];
++            if (cached.object == (__bridge void*)buffer && cached.offset == offset &&
++                cached.stride == stride) {
++                continue;
++            }
++            cached = {(__bridge void*)buffer, offset, stride};
++        }
++        [enc setVertexBuffer:buffer offset:offset attributeStride:stride atIndex:slot.slot];
+     }
+     return true;

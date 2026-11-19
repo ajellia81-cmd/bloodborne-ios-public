@@ -35,7 +35,28 @@ void bb_ios_metal_commit_locked(void *buffer) {
         pthread_mutex_unlock(&queue_registry_lock);
         last_queue = identity;
     }
+    // Sample one submission in 32 on each submitting thread, using the existing callback.
+    static _Thread_local unsigned sequence;
+    const BOOL sampled = (++sequence & 31u) == 0;
+    const uint64_t submitted = sampled ? clock_gettime_nsec_np(CLOCK_MONOTONIC) : 0;
     [command addCompletedHandler:^(id<MTLCommandBuffer> completed) {
+        if (sampled && completed.GPUEndTime > completed.GPUStartTime) {
+            static pthread_mutex_t sample_lock = PTHREAD_MUTEX_INITIALIZER;
+            static unsigned count;
+            static double gpu_sum, gpu_max, latency_max;
+            const double gpu = 1000.0 * (completed.GPUEndTime - completed.GPUStartTime);
+            const double latency = (clock_gettime_nsec_np(CLOCK_MONOTONIC) - submitted) / 1e6;
+            pthread_mutex_lock(&sample_lock);
+            gpu_sum += gpu;
+            if (gpu > gpu_max) gpu_max = gpu;
+            if (latency > latency_max) latency_max = latency;
+            if (++count == 32) {
+                printf("iOS Metal sampled submissions: GPU mean %.2f ms max %.2f ms, submit-to-callback max %.2f ms (32 samples)\n", gpu_sum / count, gpu_max, latency_max);
+                count = 0;
+                gpu_sum = gpu_max = latency_max = 0;
+            }
+            pthread_mutex_unlock(&sample_lock);
+        }
         if (completed.status == MTLCommandBufferStatusError) {
             fprintf(stderr,"iOS Metal command failed: label=%s gpu=%.2f ms; %s\n",completed.label.UTF8String,1000.0*(completed.GPUEndTime-completed.GPUStartTime),completed.error.description.UTF8String);
         }
