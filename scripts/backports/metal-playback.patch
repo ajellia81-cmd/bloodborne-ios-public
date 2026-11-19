@@ -1,0 +1,110 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.h
+@@ -22,4 +22,5 @@
+ #include <vulkan/vulkan_metal.h>
+ #include "common/types.h"
++#include "video_core/renderer_metal/mtl_depth_stencil.h"
+ 
+ namespace MetalShadow {
+@@ -51,4 +52,5 @@
+     void* pipeline{};
+     void* depth_stencil{};
++    Metal::DepthStencilKey depth_key{};
+     u32 fill{~0u}, clip{~0u}, cull{~0u}, winding{~0u};
+     u64 viewport_hash{}, scissor_hash{};
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
+@@ -612,6 +612,6 @@
+     Metal::DepthStencilKey ds;
+     ds.depth_test = depth_test && p.depth_pixel_format;
+-    ds.depth_write = depth_write && p.depth_pixel_format;
+-    ds.depth_compare = u8(depth_compare);
++    ds.depth_write = ds.depth_test && depth_write;
++    if (ds.depth_test) ds.depth_compare = u8(depth_compare);
+     ds.stencil_test = stencil_test && p.stencil_pixel_format;
+     // bloodborne-runtime: the current DepthStencilKey (mtl_depth_stencil.h) holds the Vulkan
+@@ -627,9 +627,16 @@
+         return out;
+     };
+-    ds.front = face(o.front);
+-    ds.back = face(o.back);
+-    if (void* state = MetalShadow::DepthStencil(ds); state && c.depth_stencil != state) {
+-        c.depth_stencil = state;
+-        [enc setDepthStencilState:(__bridge id<MTLDepthStencilState>)state];
++    if (ds.stencil_test) {
++        ds.front = face(o.front);
++        ds.back = face(o.back);
++    }
++    if (!c.depth_stencil || !(c.depth_key == ds)) {
++        if (void* state = MetalShadow::DepthStencil(ds)) {
++            if (c.depth_stencil != state) {
++                [enc setDepthStencilState:(__bridge id<MTLDepthStencilState>)state];
++                c.depth_stencil = state;
++            }
++            c.depth_key = ds;
++        }
+     }
+     if (ds.stencil_test && (c.ref_front != o.front.reference || c.ref_back != o.back.reference)) {
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_shadow.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_shadow.mm
+@@ -48,7 +48,6 @@
+     Metal::PsoCache& pso;
+     Metal::DepthStencilCache depth_stencil{device};
+     std::mutex mutex;
+-    std::unordered_map<u64, std::shared_ptr<std::vector<u32>>> spirv;      ///< by VkShaderModule
+     std::unordered_map<u64, std::shared_ptr<Metal::ShaderModule>> modules; ///< by VkShaderModule
+     /// Metal PSOs hold compiled shader pointers beyond a Vulkan module handle's lifetime.
+     /// Keep one module per distinct SPIR-V, even when Vulkan reuses a handle.
+@@ -152,10 +151,8 @@
+ void RegisterModule(vk::ShaderModule module, std::span<const u32> spirv) {
+     auto& s = Get();
+     const u64 hash = XXH3_64bits(spirv.data(), spirv.size_bytes());
+-    auto words = std::make_shared<std::vector<u32>>(spirv.begin(), spirv.end());
+     std::scoped_lock lock{s.mutex};
+     const u64 handle = u64(VkShaderModule(module));
+-    s.spirv[handle] = std::move(words);
+     auto& known = s.module_cache[hash];
+     for (const auto& candidate : known) {
+         const auto old = candidate->Spirv();
+@@ -177,7 +174,6 @@
+     auto& s = Get();
+     const u64 handle = u64(VkShaderModule(module));
+     std::scoped_lock lock{s.mutex};
+-    s.spirv.erase(handle);
+     s.modules.erase(handle);
+ }
+ 
+@@ -275,9 +271,9 @@
+ /// them into plain constants, so SPIRV-Cross emits no Metal function constants (a pipeline state
+ /// would then need a specialized function): OpSpecConstant's literal, OpSpecConstantTrue/False by
+ /// opcode, the SpecId decorations dropped. OpSpecConstantOp stays (none in the host shaders).
+-std::vector<u32> Specialize(const std::vector<u32>& words, const VkSpecializationInfo* info) {
++std::vector<u32> Specialize(std::span<const u32> words, const VkSpecializationInfo* info) {
+     if (words.size() < 5) {
+-        return words;
++        return {words.begin(), words.end()};
+     }
+     std::unordered_map<u32, u32> spec_ids; // result id -> SpecId
+     for (size_t i = 5; i < words.size();) {
+@@ -343,16 +339,16 @@
+ 
+ const Metal::CompiledShader* CompileStage(State& s, const VkPipelineShaderStageCreateInfo& stage,
+                                           const char* what) {
+-    std::shared_ptr<std::vector<u32>> words;
++    std::shared_ptr<Metal::ShaderModule> module;
+     {
+         std::scoped_lock lock{s.mutex};
+-        auto it = s.spirv.find(u64(stage.module));
+-        if (it == s.spirv.end()) {
++        auto it = s.modules.find(u64(stage.module));
++        if (it == s.modules.end()) {
+             return nullptr;
+         }
+-        words = it->second;
++        module = it->second;
+     }
+-    const std::vector<u32> spec = Specialize(*words, stage.pSpecializationInfo);
++    const std::vector<u32> spec = Specialize(module->Spirv(), stage.pSpecializationInfo);
+     const u64 hash = XXH3_64bits(spec.data(), spec.size() * 4);
+     auto result = s.compiler.Compile(spec, hash, what);
+     if (result.status != Metal::CompileStatus::Ok) {

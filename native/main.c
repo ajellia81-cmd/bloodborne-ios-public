@@ -34,7 +34,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 28; foreground haptics and audio priming.");
+    puts("Bloodborne iOS build 29; gameplay Metal state and cold-cache optimizations.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);

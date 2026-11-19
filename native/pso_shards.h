@@ -31,6 +31,7 @@ class Shards {
     std::condition_variable cv;
     std::deque<Job> queue;
     bool stop=false,on=false,persist=false;
+    bool empty_read_only=false;
     unsigned building=0;
     std::thread writer;
     using Clock=std::chrono::steady_clock;
@@ -140,6 +141,7 @@ public:
         }
         Sweep();on=true;
         const char* save=std::getenv("BB_IOS_PSO_WRITE");persist=save&&save[0]=='1';
+        empty_read_only = !persist && observed_files == 0;
         if(persist)writer=std::thread{[this]{Loop();}};
         std::puts("iOS PSO cache: bounded shards enabled; entry <=1 MiB, disk budget 128 MiB/2048 entries, queue <=64; persistence opt-in; default read-only; no bulk archive loaded");
 #else
@@ -151,7 +153,19 @@ public:
     }
     bool Enabled()const{return on;}
     template<typename Descriptor,typename Create>id CreatePipeline(Descriptor* desc,Create create,bool& hit,std::string& error){
-        hit=false;id state=nil;NSError* ns_error=nil;auto label=Label(desc);
+        hit=false;id state=nil;NSError* ns_error=nil;
+        // No writer can add a shard in this session. Avoid descriptor hashing, OS
+        // headroom queries and serialized filesystem probes on a cold start.
+        if (empty_read_only) {
+            ++misses;
+            ++fast_skipped;
+            desc.binaryArchives=nil;
+            state=create(MTLPipelineOptionNone,&ns_error);
+            if (!state) error=ns_error?ns_error.localizedDescription.UTF8String:"Metal pipeline creation failed";
+            Report();
+            return state;
+        }
+        auto label=Label(desc);
         char name[32];std::snprintf(name,sizeof(name),"%016llx.bin",(unsigned long long)XXH3_64bits(label.data(),label.size()));const auto path=root/name;
         if(Headroom()){
             std::scoped_lock one_loaded_archive{load_mutex};std::error_code ec;auto size=std::filesystem::file_size(path,ec);
