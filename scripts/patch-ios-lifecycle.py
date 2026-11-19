@@ -79,8 +79,19 @@ p=root/'src/runtime_audio.c';s=p.read_text()
 needle='static int initialized, sdl_ready=-1;'
 assert s.count(needle)==1
 s=s.replace(needle,needle+'\nstatic int lifecycle_paused;')
+needle='static int initialized, sdl_ready=-1;'
+s=s.replace(needle,needle+'''
+static void ios_resume_primed(Port *p) {
+    static const unsigned char silence[2048*8*4];
+    int bytes=p->frames*p->channels*p->sample_bytes;
+    if (bytes>0 && bytes<=(int)sizeof(silence)) {
+        for (int i=0;i<2;++i) SDL_PutAudioStreamData(p->stream,silence,bytes);
+    }
+    SDL_ResumeAudioStreamDevice(p->stream);
+}
+''')
 s=s.replace('if (p->stream) SDL_ResumeAudioStreamDevice(p->stream);',
-            'if (p->stream) { if (!lifecycle_paused) SDL_ResumeAudioStreamDevice(p->stream); }')
+            'if (p->stream) { if (!lifecycle_paused) ios_resume_primed(p); }')
 s+='''
 void runtime_audio_set_paused(int paused) {
     pthread_mutex_lock(&table_lock);
@@ -92,7 +103,7 @@ void runtime_audio_set_paused(int paused) {
         if (p->stream) {
             if (paused) SDL_PauseAudioStreamDevice(p->stream);
             SDL_ClearAudioStream(p->stream);
-            if (!paused) SDL_ResumeAudioStreamDevice(p->stream);
+            if (!paused) ios_resume_primed(p);
         }
         p->next_deadline_ns=0;
         p->adjust_ns=0;p->window_min=0;p->window_count=0;

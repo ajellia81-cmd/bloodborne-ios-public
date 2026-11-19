@@ -94,8 +94,11 @@ void bb_ios_note_frame(void){
     pthread_mutex_unlock(&frame_stats_lock);
 }
 
+extern void bb_ios_motor_suspend(void);
+extern void bb_ios_motor_resume(void);
 static void resume_game(void);
 static void pause_game(void) {
+    bb_ios_motor_suspend();
     if (inactive) return;
     // UIKit can notify reentrantly while this thread owns a drawable transaction.
     // Close admission now and drain after that transaction unwinds.
@@ -134,6 +137,7 @@ static void pause_game(void) {
     puts("iOS lifecycle: inactive; guest execution, audio and Metal submissions paused");
 }
 static void resume_game(void) {
+    bb_ios_motor_resume();
     if (!inactive) return;
     runtime_audio_set_paused(0);
     inactive=0;
