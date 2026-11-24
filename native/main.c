@@ -34,7 +34,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 34; shared Metal kernel pipelines.");
+    puts("Bloodborne iOS build 35; Metal pool regions and frame phase timing.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
@@ -53,6 +53,7 @@ int main(int argc,char **argv) {
     setenv("BB_METAL_NATIVE_BOOT","1",1);
     setenv("BB_GFX_BACKEND","metal",1);
     setenv("BB_POOL_SPLIT","0",1);
+    setenv("BB_POOL_PIECE_MB","16",1);
     setenv("BB_DMEM_MB","4608",1);
     setenv("BB_AUTO_GRAPHICS_HEAP","0",1);
     puts("iOS memory budget: retail graphics heaps; native output with memory-safe internal scene");

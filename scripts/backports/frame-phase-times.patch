@@ -1,0 +1,40 @@
+--- a/gpu/shadps4/video_core/renderer_vulkan/vk_presenter.cpp
++++ b/gpu/shadps4/video_core/renderer_vulkan/vk_presenter.cpp
+@@ -312,4 +312,7 @@
+ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& attribute,
+                                VAddr cpu_address) {
++    using FrameClock = std::chrono::steady_clock;
++    static thread_local FrameClock::time_point previous_end{};
++    const auto entered = FrameClock::now();
+     BbTimeline::Note(BbTimeline::PipeTask, 4, draw_scheduler.CurrentTick());
+     // bbport: scaled upscaler presets: the output-size display buffer drawn by the port.
+@@ -324,5 +327,7 @@
+     }
+ 
++    const auto image_ready = FrameClock::now();
+     Frame* frame = GetRenderFrame();
++    const auto acquired = FrameClock::now();
+ 
+     const auto frame_subresources = vk::ImageSubresourceRange{
+@@ -437,5 +442,7 @@
+     frame->ready_tick = draw_scheduler.CurrentTick();
+     SubmitInfo info{};
++    const auto before_flush = FrameClock::now();
+     draw_scheduler.Flush(info);
++    const auto flushed = FrameClock::now();
+     BbTimeline::Note(BbTimeline::PipeTask, 5, frame->ready_tick);
+ 
+@@ -460,4 +467,13 @@
+         }
+     }
++    const auto ended = FrameClock::now();
++    if (previous_end != FrameClock::time_point{} &&
++        ended - previous_end >= std::chrono::milliseconds(100)) {
++        const auto ms = [](auto span) { return std::chrono::duration<double, std::milli>(span).count(); };
++        std::printf("iOS slow prepare cycle: outside %.2f image %.2f acquire %.2f encode %.2f flush %.2f pacing %.2f ms\n",
++                    ms(entered - previous_end), ms(image_ready - entered), ms(acquired - image_ready),
++                    ms(before_flush - acquired), ms(flushed - before_flush), ms(ended - flushed));
++    }
++    previous_end = ended;
+     return frame;
+ }
