@@ -16,12 +16,12 @@ static inline void bb_ios_wait_foreground(void) {}
 #endif
 '''
 for path, functions in {
-    'recomp/src/cpu/recomp.c':[
+    'bbcpu/src/cpu/recomp.c':[
         'static uint64_t rc_step(BbCpu *cpu) {',
         'static void rc_call(BbCpu *cpu, uint64_t target, uint64_t next) {',
         'static void rc_tail(BbCpu *cpu) {',
         'static void rc_bail(BbCpu *cpu, uint64_t entry_rsp) {'],
-    'recomp/src/cpu/interp.c':['    while (cpu->rip != stop) {'],
+    'bbcpu/src/cpu/interp.c':['    while (cpu->rip != stop) {'],
 }.items():
     p=root/path;s=p.read_text();s=cpu_header+s
     for fn in functions:

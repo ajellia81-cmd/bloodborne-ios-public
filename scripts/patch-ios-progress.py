@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bounded, non-terminating interpreter progress telemetry; no signals or guest edits."""
 from pathlib import Path
-root = Path("upstream-runtime/recomp/src/cpu")
+root = Path("upstream-runtime/bbcpu/src/cpu")
 p = root / "cpu.c"
 s = p.read_text()
 marker = "static BbCpu *current_cpu(void) {"

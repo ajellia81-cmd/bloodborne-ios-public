@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Add terminating-fault diagnostics for the pinned interpreter (no recovery)."""
 from pathlib import Path
-root = Path("upstream-runtime/recomp/src/cpu")
+root = Path("upstream-runtime/bbcpu/src/cpu")
 cpu = root / "cpu.c"
 text = cpu.read_text()
 assert "uint64_t bbcpu_guest_rip(void)" in text

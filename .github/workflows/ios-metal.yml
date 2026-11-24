@@ -46,9 +46,9 @@ jobs:
           mkdir -p output
           git init upstream-runtime
           git -C upstream-runtime remote add origin https://github.com/bloodborne-native/bloodborne-runtime.git
-          git -C upstream-runtime fetch --depth 1 origin 14dbd84263b3a08d001eb7fb1128e98f4c5f2be9
+          git -C upstream-runtime fetch --depth 1 origin d97fc678a912b2b6c23715f24ab0f197f646d55b
           git -C upstream-runtime checkout --detach FETCH_HEAD
-          git -C upstream-runtime submodule update --init --depth 1 recomp third_party/LibAtrac9 gpu/third_party/imgui
+          git -C upstream-runtime submodule update --init --depth 1 bbcpu recomp third_party/LibAtrac9 gpu/third_party/imgui
           git -C upstream-runtime rev-parse HEAD | tee output/runtime-sha.txt
           echo "sha=$(git -C upstream-runtime rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Normalize immutable upstream source timestamps
@@ -66,7 +66,6 @@ jobs:
           python3 scripts/patch-ios-lifecycle.py
           python3 scripts/patch-ios-streaming.py
           python3 scripts/patch-ios-pso-cache.py
-          python3 scripts/patch-ios-tessellation.py
           python3 scripts/patch-ios-observers.py
           python3 scripts/patch-ios-formats-performance.py
           clang++ -std=c++20 -Wall -Wextra -Werror -Inative tests/tess_inputs.cpp -o output/tess-inputs-test
