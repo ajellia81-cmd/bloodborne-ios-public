@@ -1,0 +1,25 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
+@@ -945,5 +945,10 @@
+ /// their Metal replacement (a render pass's depth plane, or a copy of the slice).
+ std::unordered_set<VkImageView> slice_views;
++std::atomic<bool> has_slice_views{false};
+ void NoteSliceView(VkImageView view, const char* use) {
++    // Ordinary view bindings need no diagnostic lookup when no slice views are live.
++    if (!has_slice_views.load(std::memory_order_acquire)) {
++        return;
++    }
+     VkFormat format{};
+     u32 layer = 0;
+@@ -989,4 +994,5 @@
+         slice_views.erase(view);
+     }
++    has_slice_views.store(!slice_views.empty(), std::memory_order_release);
+ }
+ 
+@@ -996,4 +1002,5 @@
+     view_infos.erase(view);
+     slice_views.erase(view);
++    has_slice_views.store(!slice_views.empty(), std::memory_order_release);
+ }
+ 
