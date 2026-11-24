@@ -1,0 +1,73 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_pso_cache.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_pso_cache.mm
+@@ -174,4 +174,12 @@
+     std::unordered_map<GeometryMapKey, std::unique_ptr<GeometryPipeline>, GeometryMapHash> geometry;
+ 
++    // Kernel descriptors in MakeKernel vary only by function and stage input layout.
++    using KernelKey = std::pair<uintptr_t, std::vector<u64>>;
++    struct SharedKernel {
++        id<MTLFunction> function;
++        id<MTLComputePipelineState> state;
++    };
++    std::mutex kernel_mutex;
++    std::map<KernelKey, SharedKernel> kernel_states;
+     std::mutex debug_mutex; ///< BB_GS_DEBUG: the magenta fragment functions by source
+     std::map<std::string, std::unique_ptr<CompiledShader>> debug_fragments;
+@@ -906,22 +914,41 @@
+     desc.computeFunction = (__bridge id<MTLFunction>)shader.function;
+     desc.stageInputDescriptor = stage_in;
+-    bool archived = false;
+-    id state = CreateWithArchive(
+-        impl, archive_loaded, desc,
+-        [&](MTLPipelineOption options, NSError** err) {
+-            return [impl.mtl_device newComputePipelineStateWithDescriptor:desc
+-                                                                  options:options
+-                                                               reflection:nil
+-                                                                    error:err];
+-        },
+-        record, archived, error);
+-    from_archive = from_archive && archived;
+-    if (!state) {
+-        return false;
+-    }
+-    id<MTLComputePipelineState> compute_state = state;
++    PsoCache::Impl::KernelKey key{reinterpret_cast<uintptr_t>(shader.function), {}};
++    auto& layout = key.second;
++    if (stage_in) {
++        layout.push_back(stage_in.indexType);
++        layout.push_back(stage_in.indexBufferIndex);
++        for (NSUInteger i = 0; i < 31; ++i) {
++            MTLAttributeDescriptor* attribute = stage_in.attributes[i];
++            if (attribute.format == MTLAttributeFormatInvalid) continue;
++            MTLBufferLayoutDescriptor* buffer = stage_in.layouts[attribute.bufferIndex];
++            layout.insert(layout.end(), {u64(i), u64(attribute.format), u64(attribute.offset),
++                u64(attribute.bufferIndex), u64(buffer.stride), u64(buffer.stepFunction),
++                u64(buffer.stepRate)});
++        }
++    }
++    id<MTLComputePipelineState> compute_state = nil;
++    {
++        std::scoped_lock lock{impl.kernel_mutex};
++        auto found = impl.kernel_states.find(key);
++        if (found != impl.kernel_states.end()) compute_state = found->second.state;
++    }
++    if (!compute_state) {
++        bool archived = false;
++        compute_state = CreateWithArchive(
++            impl, archive_loaded, desc,
++            [&](MTLPipelineOption options, NSError** err) {
++                return [impl.mtl_device newComputePipelineStateWithDescriptor:desc
++                            options:options reflection:nil error:err];
++            }, record, archived, error);
++        from_archive = from_archive && archived;
++        if (!compute_state) return false;
++        std::scoped_lock lock{impl.kernel_mutex};
++        impl.kernel_states.try_emplace(std::move(key),
++            PsoCache::Impl::SharedKernel{desc.computeFunction, compute_state});
++    }
+     kernel.max_total_threads = static_cast<u32>(compute_state.maxTotalThreadsPerThreadgroup);
+     kernel.thread_execution_width = static_cast<u32>(compute_state.threadExecutionWidth);
+-    kernel.state = (__bridge_retained void*)state;
++    kernel.state = (__bridge_retained void*)compute_state;
+     return true;
+ }
