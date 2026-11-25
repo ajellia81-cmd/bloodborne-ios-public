@@ -4,6 +4,7 @@
 #if TARGET_OS_IPHONE
 #include <os/proc.h>
 extern "C" int bb_ios_is_background(void);
+extern "C" int bb_ios_memory_pressure(void);
 #endif
 #include <atomic>
 #include <deque>
@@ -42,7 +43,7 @@ class Shards {
     std::uintmax_t observed_bytes=0;std::size_t observed_files=0;
     static bool Headroom(){
 #if TARGET_OS_IPHONE
-        return !bb_ios_is_background()&&os_proc_available_memory()>=MinHeadroom;
+        return !bb_ios_is_background()&&!bb_ios_memory_pressure()&&os_proc_available_memory()>=MinHeadroom;
 #else
         return false;
 #endif

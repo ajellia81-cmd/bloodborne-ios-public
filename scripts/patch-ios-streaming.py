@@ -41,6 +41,14 @@ s=s.replace(needle,needle+'''
         if(total_used_memory<critical_gc_memory && (visited&7)==0 &&
            std::chrono::steady_clock::now()-ios_gc_start>=std::chrono::milliseconds(2)) return true;
 #endif''')
+s='#if defined(__APPLE__)\nextern "C" int bb_ios_memory_pressure(void);\n#endif\n'+s
+needle='        gc_second = second;'
+assert s.count(needle)==1
+s=s.replace(needle,needle+"""
+#if TARGET_OS_IPHONE
+        if (bb_ios_memory_pressure() && vram_short_until.load(std::memory_order_relaxed)<second+2)
+            vram_short_until.store(second+2,std::memory_order_relaxed);
+#endif""")
 p.write_text(s)
 p=Path('upstream-runtime/gpu/shadps4/video_core/renderer_metal/mtl_pso_cache.mm');s=p.read_text()
 s='#include <TargetConditionals.h>\n'+s

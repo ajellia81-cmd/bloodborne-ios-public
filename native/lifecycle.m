@@ -3,6 +3,7 @@
 #include "lifecycle.h"
 #include <stdio.h>
 #include <time.h>
+#include <stdatomic.h>
 #include <pthread.h>
 #import <os/proc.h>
 #import <mach/mach.h>
@@ -11,6 +12,11 @@ extern void runtime_audio_set_paused(int paused);
 static NSMutableSet<id<MTLCommandQueue>> *queues;
 static int inactive;
 static pthread_mutex_t queue_registry_lock=PTHREAD_MUTEX_INITIALIZER;
+static _Atomic(time_t) pressure_until;
+int bb_ios_memory_pressure(void) {
+    time_t deadline = atomic_load(&pressure_until);
+    return deadline && time(NULL) < deadline;
+}
 static void memory_report(const char *stage) {
     task_vm_info_data_t info={0};mach_msg_type_number_t count=TASK_VM_INFO_COUNT;
     if(task_info(mach_task_self(),TASK_VM_INFO,(task_info_t)&info,&count)==KERN_SUCCESS)
@@ -168,7 +174,7 @@ void bb_ios_lifecycle_install(void) {
         [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil
                        usingBlock:^(NSNotification *note) { resume_game(); }];
         [center addObserverForName:UIApplicationDidReceiveMemoryWarningNotification object:nil queue:nil
-                       usingBlock:^(NSNotification *note) { memory_report("UIKit memory warning"); }];
+                       usingBlock:^(NSNotification *note) { atomic_store(&pressure_until, time(NULL) + 30); memory_report("UIKit memory warning"); }];
         if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) pause_game();
     });
 }
