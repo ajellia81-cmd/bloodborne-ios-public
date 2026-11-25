@@ -34,7 +34,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 38; queued runtime haptics preparation.");
+    puts("Bloodborne iOS build 39; early controller discovery.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
@@ -76,11 +76,13 @@ int main(int argc,char **argv) {
     bb_diagnostic_mark("SDL_Init succeeded");
     puts("startup: SDL initialized");
     bb_ios_lifecycle_install();
+    bool launcher_pad_ready=false;
     int gamepad_count=0;
     SDL_JoystickID *gamepad_ids=SDL_GetGamepads(&gamepad_count);
     for(int i=0;gamepad_ids && i<gamepad_count;i++) {
         SDL_Gamepad *pad=SDL_OpenGamepad(gamepad_ids[i]);
         bb_ios_haptic_warmup(pad);
+        if (pad) launcher_pad_ready=true;
         fprintf(stdout,"Launcher gamepad %u: %s\n",(unsigned)gamepad_ids[i],pad ? SDL_GetGamepadName(pad) : SDL_GetError());
     }
     SDL_free(gamepad_ids);
@@ -108,6 +110,7 @@ int main(int argc,char **argv) {
     bb_diagnostic_mark("launcher renderer created");
     puts("startup: launcher renderer created");
     SDL_SetRenderLogicalPresentation(renderer,0,0,SDL_LOGICAL_PRESENTATION_DISABLED);
+    const Uint64 discovery_deadline=SDL_GetTicks()+500;
     int start=0, profile_failed=0;
     for (;;) {
         SDL_Event event;
@@ -115,6 +118,7 @@ int main(int argc,char **argv) {
             if(event.type==SDL_EVENT_GAMEPAD_ADDED) {
                 SDL_Gamepad *pad=SDL_OpenGamepad(event.gdevice.which);
                 bb_ios_haptic_warmup(pad);
+                if (pad) launcher_pad_ready=true;
                 fprintf(stdout,"Launcher gamepad added: %s\n",pad ? SDL_GetGamepadName(pad) : SDL_GetError());
             }
             if(event.type==SDL_EVENT_GAMEPAD_REMOVED) {
@@ -128,6 +132,10 @@ int main(int argc,char **argv) {
         char eboot[4096]; snprintf(eboot,sizeof(eboot),"%s/eboot.bin",game);
         int ready=exists(boot)&&exists(eboot)&&exists(content)&&exists(xml);
         if (ready && (!profile_failed || start)) {
+            if (!launcher_pad_ready && SDL_GetTicks()<discovery_deadline) {
+                SDL_Delay(8);
+                continue;
+            }
             if (!bb_ios_screen_profile(window,config)) break;
             profile_failed=1;
         }

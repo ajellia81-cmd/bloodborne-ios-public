@@ -7,7 +7,7 @@ static void warm(SDL_Gamepad *pad,unsigned phase){
     if(!pad)return;
     SDL_JoystickID id=SDL_GetGamepadID(pad);if(!id)return;
     unsigned slot=32;
-    for(unsigned i=0;i<32;++i)if(warmed[i].id==id){if(warmed[i].phases&phase)return;slot=i;break;}
+    for(unsigned i=0;i<32;++i)if(warmed[i].id==id){if(warmed[i].phases)return;slot=i;break;}
     Uint64 start=SDL_GetTicksNS();
     bool ok=SDL_RumbleGamepad(pad,1,1,1);
     if(ok){SDL_RumbleGamepad(pad,0,0,0);if(slot==32){slot=next++%32;warmed[slot].id=id;warmed[slot].phases=0;}warmed[slot].phases|=phase;}

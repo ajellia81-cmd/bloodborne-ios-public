@@ -10,9 +10,9 @@ int main(void){
  SDL_Gamepad p={1},q={2};bb_ios_haptic_warmup(NULL);assert(calls==0);
  bb_ios_haptic_warmup(&p);assert(calls==2&&lows[0]==1&&highs[0]==1&&durations[0]==1&&lows[1]==0&&highs[1]==0&&durations[1]==0);
  bb_ios_haptic_warmup(&p);assert(calls==2);
- bb_ios_haptic_runtime_ready(&p);assert(calls==4);bb_ios_haptic_runtime_ready(&p);assert(calls==4);
- allow=0;bb_ios_haptic_warmup(&q);assert(calls==5);
- allow=1;bb_ios_haptic_warmup(&q);assert(calls==7);
- bb_ios_haptic_warmup(&q);assert(calls==7);
+ bb_ios_haptic_runtime_ready(&p);assert(calls==2);bb_ios_haptic_runtime_ready(&p);assert(calls==2);
+ allow=0;bb_ios_haptic_warmup(&q);assert(calls==3);
+ allow=1;bb_ios_haptic_runtime_ready(&q);assert(calls==5);
+ bb_ios_haptic_warmup(&q);assert(calls==5);
  puts("PASS: tiny nonzero warmup then stop, launcher/runtime phase and per-controller deduplication, unavailable-controller retry");
 }
