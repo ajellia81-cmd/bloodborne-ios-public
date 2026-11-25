@@ -34,7 +34,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 35; Metal pool regions and frame phase timing.");
+    puts("Bloodborne iOS build 36; contiguous Metal pool and automatic boot.");
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
@@ -53,7 +53,7 @@ int main(int argc,char **argv) {
     setenv("BB_METAL_NATIVE_BOOT","1",1);
     setenv("BB_GFX_BACKEND","metal",1);
     setenv("BB_POOL_SPLIT","0",1);
-    setenv("BB_POOL_PIECE_MB","16",1);
+    setenv("BB_POOL_PIECE_MB","0",1);
     setenv("BB_DMEM_MB","4608",1);
     setenv("BB_AUTO_GRAPHICS_HEAP","0",1);
     puts("iOS memory budget: retail graphics heaps; native output with memory-safe internal scene");
@@ -107,7 +107,7 @@ int main(int argc,char **argv) {
     bb_diagnostic_mark("launcher renderer created");
     puts("startup: launcher renderer created");
     SDL_SetRenderLogicalPresentation(renderer,0,0,SDL_LOGICAL_PRESENTATION_DISABLED);
-    int start=0;
+    int start=0, profile_failed=0;
     for (;;) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -126,6 +126,10 @@ int main(int argc,char **argv) {
         }
         char eboot[4096]; snprintf(eboot,sizeof(eboot),"%s/eboot.bin",game);
         int ready=exists(boot)&&exists(eboot)&&exists(content)&&exists(xml);
+        if (ready && (!profile_failed || start)) {
+            if (!bb_ios_screen_profile(window,config)) break;
+            profile_failed=1;
+        }
         int pixel_width=0,pixel_height=0;
         SDL_GetWindowSizeInPixels(window,&pixel_width,&pixel_height);
         float ui_scale=pixel_height>0 ? pixel_height/540.0f : 1.0f;
@@ -141,14 +145,13 @@ int main(int argc,char **argv) {
         SDL_RenderDebugText(renderer,40,240,"  content.bin      AppContent profile from your game");
         SDL_RenderDebugText(renderer,40,260,"Korean requested (SCE 9); available text depends on your regional game data.");
         SDL_RenderDebugText(renderer,40,290,"This build has not been tested on a physical iPhone.");
-        SDL_RenderDebugText(renderer,40,330,ready?"Files found. Tap screen or press controller A to try booting.":"Required files missing. Copy files into the app, then tap to recheck.");
+        SDL_RenderDebugText(renderer,40,330,ready?"Display profile preparation failed. Tap or press controller A to retry.":"Required files missing. Copy files into the app, then tap to recheck.");
         SDL_RenderDebugText(renderer,40,370,aot_available ? "Personal AOT library present; runtime validates functions at boot." : "CPU interpreter only: game performance is expected to be limited.");
         SDL_RenderDebugText(renderer,40,400,"Logs: Bloodborne/runtime.log");
         char display_text[128];
         snprintf(display_text,sizeof(display_text),"Native display: %d x %d pixels, aspect %.5f",pixel_width,pixel_height,pixel_height ? (double)pixel_width/pixel_height : 0.0);
         SDL_RenderDebugText(renderer,40,440,display_text);
         SDL_RenderPresent(renderer);
-        if (start&&ready && !bb_ios_screen_profile(window,config)) break;
         start=0; SDL_Delay(33);
     }
     SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window);
