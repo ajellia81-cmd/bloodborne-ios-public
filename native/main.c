@@ -13,6 +13,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <time.h>
 void bb_diagnostic_mark(const char *stage);
 int bb_probe_main(int argc,char **argv);
 static int exists(const char *p) { return access(p,R_OK)==0; }
@@ -34,7 +35,8 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 40; UIKit memory pressure response.");
+    puts("Bloodborne iOS build 41; earlier texture reclamation.");
+    printf("iOS session: pid=%ld epoch=%lld\n",(long)getpid(),(long long)time(NULL));
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
     setenv("BB_USER_DIR",user,1);
@@ -44,7 +46,8 @@ int main(int argc,char **argv) {
     setenv("BB_METAL_ARCHIVE","0",1);
     setenv("BB_IOS_PSO_SHARDS","1",1);
     setenv("BB_IOS_PSO_WRITE","1",1);
-    setenv("BB_GC_PRESSURE_IDLE_SECONDS","8",1);
+    setenv("BB_GC_BUDGET_CAP_MB","7936",1);
+    setenv("BB_GC_PRESSURE_IDLE_SECONDS","5",1);
     setenv("BB_AUDIO_STATS","1",1);
     setenv("BB_VK_RECORD_THREADS","2",1);
     setenv("BB_FRAMES_AHEAD","2",1);

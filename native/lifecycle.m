@@ -20,9 +20,9 @@ int bb_ios_memory_pressure(void) {
 static void memory_report(const char *stage) {
     task_vm_info_data_t info={0};mach_msg_type_number_t count=TASK_VM_INFO_COUNT;
     if(task_info(mach_task_self(),TASK_VM_INFO,(task_info_t)&info,&count)==KERN_SUCCESS)
-        printf("iOS memory (%s): footprint=%llu MiB, remaining allocation allowance=%llu MiB\n",stage,
+        printf("iOS memory (%s): footprint=%llu MiB, remaining allocation allowance=%llu MiB epoch=%lld\n",stage,
             (unsigned long long)(info.phys_footprint>>20),
-            (unsigned long long)(os_proc_available_memory()>>20));
+            (unsigned long long)(os_proc_available_memory()>>20),(long long)time(NULL));
 }
 
 /* Called with the GPU lease held. All runtime Metal command buffers use this bridge. */
