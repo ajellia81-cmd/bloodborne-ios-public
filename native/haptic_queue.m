@@ -2,6 +2,7 @@
 #include <SDL3/SDL.h>
 #include <stdatomic.h>
 #include <stdio.h>
+#include "haptics.h"
 
 static atomic_uint generation;
 static atomic_bool suspended;
@@ -39,6 +40,20 @@ void bb_ios_motor_resume(void) {
             SDL_CloseGamepad(pad);
         }
         SDL_free(ids);
+    });
+}
+
+void bb_ios_motor_prepare(SDL_Gamepad *pad) {
+    if (!pad || atomic_load(&suspended)) return;
+    const SDL_JoystickID id = SDL_GetGamepadID(pad);
+    if (!id) return;
+    const unsigned ticket = atomic_load(&generation);
+    dispatch_async(motor_queue(), ^{
+        if (!current(ticket)) return;
+        SDL_Gamepad *active = SDL_OpenGamepad(id);
+        if (!active) return;
+        bb_ios_haptic_runtime_ready(active);
+        SDL_CloseGamepad(active);
     });
 }
 

@@ -3,10 +3,10 @@ from pathlib import Path
 p=Path('upstream-runtime/src/runtime_pad.c');s=p.read_text()
 needle='#include <SDL3/SDL.h>'
 assert s.count(needle)==1
-s=s.replace(needle,needle+"\n#ifdef __APPLE__\n#include <TargetConditionals.h>\n#endif\n#if defined(__APPLE__) && TARGET_OS_IPHONE\nextern void bb_ios_haptic_runtime_ready(SDL_Gamepad*);\nextern void bb_ios_motor_request(SDL_Gamepad*, Uint16, Uint16);\n#else\n#define bb_ios_haptic_runtime_ready(pad) ((void)0)\n#endif")
+s=s.replace(needle,needle+"\n#ifdef __APPLE__\n#include <TargetConditionals.h>\n#endif\n#if defined(__APPLE__) && TARGET_OS_IPHONE\nextern void bb_ios_motor_prepare(SDL_Gamepad*);\nextern void bb_ios_motor_request(SDL_Gamepad*, Uint16, Uint16);\n#else\n#define bb_ios_motor_prepare(pad) ((void)0)\n#endif")
 needle='    puts("Runtime: pad opened for user 1 (SDL gamepad or keyboard)");'
 assert s.count(needle)==1
-s=s.replace(needle,needle+'\n    pthread_mutex_lock(&lock);\n    bb_ios_haptic_runtime_ready(current_gamepad());\n    pthread_mutex_unlock(&lock);')
+s=s.replace(needle,needle+'\n    pthread_mutex_lock(&lock);\n    bb_ios_motor_prepare(current_gamepad());\n    pthread_mutex_unlock(&lock);')
 
 old='''    if (g) SDL_RumbleGamepad(g,(uint16_t)(param[0]*257),(uint16_t)(param[1]*257),1000);'''
 assert s.count(old)==1
