@@ -16,6 +16,7 @@ extern "C" int bb_ios_is_background(void);
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include <unordered_set>
 #include <type_traits>
 #include <string>
 #include <chrono>
@@ -32,6 +33,7 @@ class Shards {
     std::deque<Job> queue;
     bool stop=false,on=false,persist=false;
     bool empty_read_only=false;
+    std::unordered_set<std::string> startup_shards;
     unsigned building=0;
     std::thread writer;
     using Clock=std::chrono::steady_clock;
@@ -98,7 +100,7 @@ class Shards {
                 }else ++rejected;
                 std::filesystem::remove(temp,ec);
             }
-            if(observed_bytes>MaxDisk||observed_files>MaxFiles||writes.load()%64==0)Sweep();
+            if(observed_bytes>MaxDisk||observed_files>MaxFiles||(writes.load()!=0 && writes.load()%64==0))Sweep();
             auto us=static_cast<unsigned long long>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-writing_started).count());
             write_us.fetch_add(us);max_write_us.store(std::max(max_write_us.load(),us));
             {std::scoped_lock lock{queue_mutex};next_write=Clock::now()+std::chrono::microseconds(WriteCooldownUs(us));}
@@ -139,11 +141,15 @@ public:
                 path.replace_extension(".bin");std::filesystem::remove(path,ec);ec.clear();std::filesystem::remove(i->path(),ec);ec.clear();
             }else if(path.extension()==".tmp"){std::filesystem::remove(path,ec);ec.clear();}
         }
-        Sweep();on=true;
+        Sweep();
+        for (std::filesystem::directory_iterator i(root,ec),end; !ec && i!=end; i.increment(ec)) {
+            if (i->path().extension()==".bin") startup_shards.insert(i->path().filename().string());
+        }
+        on=true;
         const char* save=std::getenv("BB_IOS_PSO_WRITE");persist=save&&save[0]=='1';
         empty_read_only = !persist && observed_files == 0;
         if(persist)writer=std::thread{[this]{Loop();}};
-        std::puts("iOS PSO cache: bounded shards enabled; entry <=1 MiB, disk budget 128 MiB/2048 entries, queue <=64; persistence opt-in; default read-only; no bulk archive loaded");
+        std::puts("iOS PSO cache: bounded shards enabled; entry <=1 MiB, disk budget 128 MiB/2048 entries, queue <=64; selective persistence; no bulk archive loaded");
 #else
         (void)cache;
 #endif
@@ -165,9 +171,16 @@ public:
             Report();
             return state;
         }
-        auto label=Label(desc);
-        char name[32];std::snprintf(name,sizeof(name),"%016llx.bin",(unsigned long long)XXH3_64bits(label.data(),label.size()));const auto path=root/name;
-        if(Headroom()){
+        auto cache_name = [&] {
+            const auto label=Label(desc);
+            char name[32];
+            std::snprintf(name,sizeof(name),"%016llx.bin",(unsigned long long)XXH3_64bits(label.data(),label.size()));
+            return std::string(name);
+        };
+        std::string name;
+        if (!startup_shards.empty()) name=cache_name();
+        if(!name.empty() && startup_shards.count(name) && Headroom()){
+            const auto path=root/name;
             std::scoped_lock one_loaded_archive{load_mutex};std::error_code ec;auto size=std::filesystem::file_size(path,ec);
             if(!ec&&Eligible(size)){
                 @autoreleasepool{
@@ -189,7 +202,7 @@ public:
             std::scoped_lock lock{queue_mutex};--building;last_creation=Clock::now();
             if(state&&!WorthPersisting(compile_us))++fast_skipped;
             else if(state&&!persist)++fast_skipped;
-            else if(state&&Headroom()&&CanQueue(queue.size()))queue.push_back({path,[desc copy]});else ++dropped;
+            else if(state&&Headroom()&&CanQueue(queue.size()))queue.push_back({root/(name.empty()?cache_name():name),[desc copy]});else ++dropped;
             cv.notify_one();
         }
         if(!state)error=ns_error?ns_error.localizedDescription.UTF8String:"Metal pipeline creation failed";

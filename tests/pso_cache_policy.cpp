@@ -11,7 +11,7 @@ int main(){
     using namespace BbIosPso;
     assert(!Eligible(0)&&Eligible(MaxEntry)&&!Eligible(MaxEntry+1));
     assert(CanQueue(63)&&!CanQueue(64)&&!CanQueue(100));
-    assert(!WorthPersisting(7999)&&WorthPersisting(8000));
+    assert(!WorthPersisting(33332)&&WorthPersisting(33333));
     assert(WriteCooldownUs(1000)==19000&&WriteCooldownUs(UINT64_MAX)==10000000);
     Flights flights;std::atomic<bool> go=false,cached=false;std::atomic<int> builds=0;
     std::vector<std::thread> threads;
