@@ -1,0 +1,38 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
+@@ -142,20 +142,26 @@
+ 
+ BufferRef ResolveBuffer(VkBuffer buffer) {
+     // The same few buffers (the guest pool, stream buffers) are bound over and over.
+-    thread_local VkBuffer cached_buffer = VK_NULL_HANDLE;
+-    thread_local __unsafe_unretained id<MTLBuffer> cached_mtl = nil;
+-    thread_local u64 cached_offset = 0, cached_generation = ~0ull;
++    struct CachedBuffer {
++        VkBuffer handle = VK_NULL_HANDLE;
++        __unsafe_unretained id<MTLBuffer> metal = nil;
++        u64 offset = 0;
++        u64 generation = ~0ull;
++    };
++    static thread_local CachedBuffer entries[16];
++    const auto hash = std::hash<VkBuffer>{}(buffer);
++    auto& entry = entries[(hash ^ (hash >> 4) ^ (hash >> 12)) & 15];
+     const u64 generation = registered_generation.load(std::memory_order_acquire);
+-    if (buffer == cached_buffer && generation == cached_generation) {
+-        return {cached_mtl, cached_offset};
++    if (buffer == entry.handle && generation == entry.generation) {
++        return {entry.metal, entry.offset};
+     }
+     {
+         std::shared_lock lock{registered_mutex};
+         if (auto it = registered.find(buffer); it != registered.end()) {
+-            cached_buffer = buffer;
+-            cached_mtl = it->second.buffer;
+-            cached_offset = it->second.offset;
+-            cached_generation = generation;
++            entry.handle = buffer;
++            entry.metal = it->second.buffer;
++            entry.offset = it->second.offset;
++            entry.generation = generation;
+             return it->second;
+         }
+     }
