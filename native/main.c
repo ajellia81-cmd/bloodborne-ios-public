@@ -32,10 +32,10 @@ int main(int argc,char **argv) {
     snprintf(log,sizeof(log),"%s/runtime.log",root);
     mkdir(user,0700);
     if (freopen(log,"a",stdout)) {
-        setvbuf(stdout,NULL,_IONBF,0);
+        setvbuf(stdout,NULL,_IOLBF,BUFSIZ);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 42; interval GPU workload accounting.");
+    puts("Bloodborne iOS build 43; bounded memory probes and line-buffered logging.");
     printf("iOS session: pid=%ld epoch=%lld\n",(long)getpid(),(long long)time(NULL));
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
