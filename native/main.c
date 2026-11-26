@@ -35,7 +35,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IONBF,0);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 41; earlier texture reclamation.");
+    puts("Bloodborne iOS build 42; interval GPU workload accounting.");
     printf("iOS session: pid=%ld epoch=%lld\n",(long)getpid(),(long long)time(NULL));
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);

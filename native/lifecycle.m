@@ -25,6 +25,8 @@ static void memory_report(const char *stage) {
             (unsigned long long)(os_proc_available_memory()>>20),(long long)time(NULL));
 }
 
+static _Atomic(uint64_t) completed_gpu_us;
+
 /* Called with the GPU lease held. All runtime Metal command buffers use this bridge. */
 void bb_ios_metal_commit_locked(void *buffer) {
     id<MTLCommandBuffer> command = (__bridge id<MTLCommandBuffer>)buffer;
@@ -46,7 +48,10 @@ void bb_ios_metal_commit_locked(void *buffer) {
     const BOOL sampled = (++sequence & 31u) == 0;
     const uint64_t submitted = sampled ? clock_gettime_nsec_np(CLOCK_MONOTONIC) : 0;
     [command addCompletedHandler:^(id<MTLCommandBuffer> completed) {
-        if (sampled && completed.GPUEndTime > completed.GPUStartTime) {
+        const double duration=completed.GPUEndTime-completed.GPUStartTime;
+        if (duration>0 && completed.GPUStartTime>0)
+            atomic_fetch_add_explicit(&completed_gpu_us,(uint64_t)(duration*1e6),memory_order_relaxed);
+        if (sampled && duration>0) {
             static pthread_mutex_t sample_lock = PTHREAD_MUTEX_INITIALIZER;
             static unsigned count;
             static double gpu_sum, gpu_max, latency_max;
@@ -85,7 +90,7 @@ void bb_ios_note_frame(void){
     struct timespec ts;clock_gettime(CLOCK_MONOTONIC,&ts);
     const uint64_t now=(uint64_t)ts.tv_sec*1000000000ull+(uint64_t)ts.tv_nsec;
     pthread_mutex_lock(&frame_stats_lock);
-    if(!last_frame_ns){last_frame_ns=window_ns=now;pthread_mutex_unlock(&frame_stats_lock);return;}
+    if(!last_frame_ns){atomic_exchange(&completed_gpu_us,0);last_frame_ns=window_ns=now;pthread_mutex_unlock(&frame_stats_lock);return;}
     const uint64_t interval=now-last_frame_ns;last_frame_ns=now;++frame_intervals;
     if(interval>frame_max_ns)frame_max_ns=interval;
     const uint64_t elapsed=now-window_ns;
@@ -95,6 +100,9 @@ void bb_ios_note_frame(void){
         printf("iOS game frames: %.2f FPS, average %.2f ms, maximum %.2f ms; thermal=%s lowPower=%d\n",
             frame_intervals*1000000000.0/elapsed,elapsed/(frame_intervals*1000000.0),frame_max_ns/1000000.0,
             thermal>=0&&thermal<4?names[thermal]:"unknown",(int)NSProcessInfo.processInfo.lowPowerModeEnabled);
+        const uint64_t gpu_us=atomic_exchange_explicit(&completed_gpu_us,0,memory_order_relaxed);
+        printf("iOS Metal completed command time per presented frame: %.2f ms (interval mean, overlaps included)\n",
+               gpu_us/(1000.0*frame_intervals));
         memory_report("frame interval");window_ns=now;frame_max_ns=frame_intervals=0;
     }
     pthread_mutex_unlock(&frame_stats_lock);
