@@ -46,7 +46,7 @@ jobs:
           mkdir -p output
           git init upstream-runtime
           git -C upstream-runtime remote add origin https://github.com/bloodborne-native/bloodborne-runtime.git
-          git -C upstream-runtime fetch --depth 1 origin d97fc678a912b2b6c23715f24ab0f197f646d55b
+          git -C upstream-runtime fetch --depth 1 origin 7556913df5a43255684e12ece65050e4a04c844b
           git -C upstream-runtime checkout --detach FETCH_HEAD
           git -C upstream-runtime submodule update --init --depth 1 bbcpu recomp third_party/LibAtrac9 gpu/third_party/imgui
           git -C upstream-runtime rev-parse HEAD | tee output/runtime-sha.txt
