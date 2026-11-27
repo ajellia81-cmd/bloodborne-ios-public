@@ -35,7 +35,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IOLBF,BUFSIZ);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 45; read-only PSO cache.");
+    puts("Bloodborne iOS build 46; texture reuse window.");
     printf("iOS session: pid=%ld epoch=%lld\n",(long)getpid(),(long long)time(NULL));
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);
@@ -47,7 +47,7 @@ int main(int argc,char **argv) {
     setenv("BB_IOS_PSO_SHARDS","1",1);
     setenv("BB_IOS_PSO_WRITE","0",1);
     setenv("BB_GC_BUDGET_CAP_MB","7936",1);
-    setenv("BB_GC_PRESSURE_IDLE_SECONDS","5",1);
+    setenv("BB_GC_PRESSURE_IDLE_SECONDS","9",1);
     setenv("BB_AUDIO_STATS","1",1);
     setenv("BB_VK_RECORD_THREADS","2",1);
     setenv("BB_FRAMES_AHEAD","2",1);
