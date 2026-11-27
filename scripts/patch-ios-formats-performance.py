@@ -8,7 +8,7 @@ import subprocess
 
 root = Path(__file__).resolve().parents[1]
 runtime = root / "upstream-runtime"
-for name in ("metal-single-region", "tess-state", "metal-encoder", "adaptive-time", "metal-playback", "raster-inputs", "compact-bindings", "slice-view-fast-path", "shared-kernel-pso", "frame-phase-times", "buffer-lookup"):
+for name in ("metal-single-region", "tess-state", "metal-encoder", "adaptive-time", "metal-playback", "raster-inputs", "compact-bindings", "slice-view-fast-path", "shared-kernel-pso", "frame-phase-times", "buffer-lookup", "image-lookup"):
     patch = root / "scripts" / "backports" / (name + ".patch")
     subprocess.run(["git", "-C", str(runtime), "apply", "--check", str(patch)], check=True)
     subprocess.run(["git", "-C", str(runtime), "apply", str(patch)], check=True)

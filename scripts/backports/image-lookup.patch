@@ -1,0 +1,35 @@
+--- a/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
++++ b/gpu/shadps4/video_core/renderer_metal/mtl_frame.mm
+@@ -199,19 +199,24 @@
+         return nil;
+     }
+     // Copies, clears and blits name the same images over and over.
+-    thread_local VkImage cached_image = VK_NULL_HANDLE;
+-    thread_local __unsafe_unretained id<MTLTexture> cached_texture = nil;
+-    thread_local u64 cached_generation = ~0ull;
++    struct CachedImage {
++        VkImage handle = VK_NULL_HANDLE;
++        __unsafe_unretained id<MTLTexture> texture = nil;
++        u64 generation = ~0ull;
++    };
++    static thread_local CachedImage entries[8];
++    const auto hash = std::hash<VkImage>{}(image);
++    auto& entry = entries[(hash ^ (hash >> 4) ^ (hash >> 12)) & 7];
+     const u64 generation = images_generation.load(std::memory_order_acquire);
+-    if (image == cached_image && generation == cached_generation) {
+-        return cached_texture;
++    if (image == entry.handle && generation == entry.generation) {
++        return entry.texture;
+     }
+     {
+         std::shared_lock lock{images_mutex};
+         if (auto it = image_textures.find(image); it != image_textures.end()) {
+-            cached_image = image;
+-            cached_texture = it->second;
+-            cached_generation = generation;
++            entry.handle = image;
++            entry.texture = it->second;
++            entry.generation = generation;
+             return it->second;
+         }
+     }
