@@ -35,7 +35,7 @@ int main(int argc,char **argv) {
         setvbuf(stdout,NULL,_IOLBF,BUFSIZ);
         dup2(fileno(stdout),STDERR_FILENO);
     }
-    puts("Bloodborne iOS build 46; texture reuse window.");
+    puts("Bloodborne iOS build 47; batched native call statistics.");
     printf("iOS session: pid=%ld epoch=%lld\n",(long)getpid(),(long long)time(NULL));
     setenv("BB_CONFIG",config,1);
     setenv("BB_GPU_USER_DIR",user,1);

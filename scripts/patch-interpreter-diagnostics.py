@@ -94,3 +94,10 @@ marker = "        bbcpu_set_tls_displacement(tls_displacement);"
 assert text.count(marker) == 1
 text = text.replace(marker, marker + "\n        bbios_heap_probes();")
 probe.write_text(text)
+
+# Publish the native fast-path diagnostic count with the same cadence as host imports.
+recomp = root / "recomp.c"
+text = recomp.read_text()
+counter = "__atomic_add_fetch(&bbcpu_native_calls, 1, __ATOMIC_RELAXED);"
+assert text.count(counter) == 1 and "static void count_batched(" in text
+recomp.write_text(text.replace(counter, "static _Thread_local uint32_t pending_native_calls;\n    count_batched(&bbcpu_native_calls, &pending_native_calls);"))
